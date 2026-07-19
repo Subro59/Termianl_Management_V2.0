@@ -1,0 +1,654 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Terminal Management System</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@500&display=swap');
+        body { font-family: 'Inter', sans-serif; background-color: #0f172a; color: #f1f5f9; margin: 0; -webkit-tap-highlight-color: transparent; overflow-x: hidden; }
+        .glass-card { background: rgba(30, 41, 59, 0.7); backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 1rem; }
+        .table-container { scrollbar-width: thin; scrollbar-color: #475569 #1e293b; max-height: 60vh; overflow: auto; }
+        .table-container::-webkit-scrollbar { width: 6px; height: 6px; }
+        .table-container::-webkit-scrollbar-track { background: #1e293b; }
+        .table-container::-webkit-scrollbar-thumb { background: #475569; border-radius: 10px; }
+        
+        .sticky-col { position: sticky; left: 0; z-index: 10; background: #1e293b; border-right: 1px solid rgba(255,255,255,0.1); }
+        
+        .tab-btn { padding: 0.4rem 1rem; font-size: 0.65rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em; border-radius: 0.5rem; transition: all 0.3s; border: 1px solid transparent; }
+        .tab-btn.active { background: #3b82f6; color: white; border-color: #60a5fa; box-shadow: 0 4px 15px rgba(59, 130, 246, 0.4); }
+        .tab-btn:not(.active) { color: #64748b; background: #1e293b; border-color: #334155; }
+        .tab-btn:not(.active):hover { background: #334155; color: #cbd5e1; }
+
+        .found-shadow::placeholder { color: #94a3b8 !important; opacity: 1; font-style: italic; }
+        
+        input[type="date"] { min-height: 34px; }
+        input[type="date"]::-webkit-calendar-picker-indicator { filter: invert(1); cursor: pointer; padding: 2px; }
+        
+        @keyframes pulse-blue { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+        .status-syncing { animation: pulse-blue 1.5s infinite; }
+        
+        .page-btn { background: #1e293b; border: 1px solid #334155; padding: 0.5rem 1rem; border-radius: 0.5rem; transition: all 0.2s; font-size: 0.75rem; }
+        .page-btn:hover:not(:disabled) { background: #334155; border-color: #475569; }
+        .page-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+        button:active { transform: scale(0.95); }
+    </style>
+</head>
+<body class="p-4 md:p-6">
+
+    <div class="max-w-full mx-auto space-y-4">
+        <!-- Header Section -->
+        <header class="flex flex-col sm:flex-row justify-between items-start gap-4 border-b border-slate-800 pb-4">
+            <div>
+                <h1 class="text-2xl font-black bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-cyan-400">Terminal Registry</h1>
+                <div class="flex items-center gap-4 mt-1">
+                    <p id="status-text" class="text-slate-400 text-[9px] font-bold uppercase flex items-center gap-2">
+                        <span id="status-dot" class="w-2 h-2 rounded-full bg-slate-500"></span>
+                        <span id="status-label">Initializing</span>
+                    </p>
+                    <button onclick="fetchSheetData()" class="bg-blue-600/10 hover:bg-blue-600 text-blue-400 hover:text-white px-2 py-1 rounded flex items-center gap-2 transition-all text-[9px] font-bold border border-blue-500/20">
+                        <i class="fas fa-sync-alt" id="sync-icon"></i> REFRESH
+                    </button>
+                </div>
+            </div>
+            
+            <div class="flex flex-col items-end text-right w-full sm:w-auto">
+                <!-- Digital Clock displaying 12 Hours format (AM/PM) -->
+                <div id="digital-clock" class="text-3xl font-bold font-mono text-white tracking-tighter leading-none">00:00:00 AM</div>
+                <div id="digital-date" class="text-[9px] text-blue-400 font-bold uppercase mt-2 bg-blue-500/10 px-2 py-1 rounded-full">-- --- ----</div>
+            </div>
+        </header>
+
+        <!-- Stats Grid (Summary Cards) -->
+        <section id="stats-grid" class="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 xl:grid-cols-10 gap-2"></section>
+
+        <!-- Main Data Table Section -->
+        <section class="glass-card overflow-hidden flex flex-col shadow-2xl">
+            <div class="p-3 border-b border-slate-700/50 bg-slate-800/20 flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4">
+                <div id="tabs-container" class="flex flex-wrap gap-1.5"></div>
+                <div class="flex flex-grow justify-between items-center w-full xl:w-auto gap-4">
+                    <div class="flex items-center gap-3 ml-2">
+                         <span id="result-count" class="text-[9px] bg-slate-800 text-blue-400 px-2 py-1 rounded font-bold">0 Results</span>
+                         <span id="page-info" class="text-[8px] text-slate-500 uppercase font-black tracking-widest">Page 1 of 1</span>
+                         <span id="last-update-time" class="text-[8px] text-slate-400 font-bold border-l border-slate-700 pl-3 uppercase">SYNC: NEVER</span>
+                    </div>
+                    <div class="relative w-full sm:w-72">
+                        <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-xs"></i>
+                        <input type="text" id="tableSearch" onkeyup="handleSearch()" placeholder="Search registry..." class="bg-slate-900 border border-slate-700 rounded-lg pl-9 pr-3 py-2 text-[11px] w-full focus:border-blue-500 outline-none">
+                    </div>
+                </div>
+            </div>
+            
+            <div class="table-container">
+                <table class="w-full text-left text-[11px] border-collapse min-w-[2000px]" id="terminalTable">
+                    <thead class="sticky top-0 bg-slate-800 z-20" id="terminalTableHeader"></thead>
+                    <tbody id="terminalTableBody" class="divide-y divide-slate-800/50">
+                        <tr><td colspan="30" class="p-10 text-center text-slate-500 italic">Waiting for data synchronization...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Responsive Pagination Controls -->
+            <div class="p-3 bg-slate-900/40 border-t border-slate-700/50 flex justify-between items-center">
+                <div class="flex gap-2">
+                    <button class="page-btn" onclick="changePage(-1)" id="prev-btn" disabled>Prev</button>
+                    <button class="page-btn" onclick="changePage(1)" id="next-btn" disabled>Next</button>
+                </div>
+                <div class="text-[9px] text-slate-500 font-bold uppercase">50 rows/page</div>
+            </div>
+        </section>
+
+        <!-- Terminal RollOut Data Update Section -->
+        <section class="glass-card p-4 border-l-4 border-l-blue-500">
+            <div class="flex items-center justify-between mb-4">
+                <div class="flex items-center gap-3">
+                    <i class="fas fa-edit text-blue-500 text-xs"></i>
+                    <h2 class="text-[10px] font-black text-white uppercase tracking-widest">Terminal RollOut Data Update</h2>
+                </div>
+                <div id="lookup-indicator" class="text-[8px] font-bold uppercase px-2 py-0.5 rounded transition-all opacity-0">TID MATCH FOUND</div>
+            </div>
+            
+            <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 xl:grid-cols-7 gap-3">
+                <div class="space-y-1">
+                    <label class="text-[9px] text-slate-500 font-bold uppercase">Sheet</label>
+                    <select id="u-sheet" onchange="handleTIDLookup()" class="w-full bg-slate-900 border border-slate-700 rounded px-2 py-1.5 text-xs focus:border-blue-500 outline-none text-slate-200 h-[34px]"></select>
+                </div>
+                <div class="space-y-1">
+                    <label class="text-[9px] text-slate-500 font-bold uppercase">TID *</label>
+                    <input type="text" id="u-tid" oninput="handleTIDLookup()" placeholder="Enter TID" class="w-full bg-slate-900 border border-slate-700 rounded px-2 py-1.5 text-xs focus:border-blue-500 outline-none h-[34px]">
+                </div>
+                <div class="space-y-1">
+                    <label class="text-[9px] text-slate-500 font-bold uppercase">Roll-out By</label>
+                    <input type="text" id="u-rby" placeholder="Name" class="w-full bg-slate-900 border border-slate-700 rounded px-2 py-1.5 text-xs focus:border-blue-500 outline-none h-[34px]">
+                </div>
+                <div class="space-y-1">
+                    <label class="text-[9px] text-slate-500 font-bold uppercase">Roll-out Date *</label>
+                    <input type="date" id="u-rdate" class="w-full bg-slate-900 border border-slate-700 rounded px-2 py-1 text-xs focus:border-blue-500 outline-none text-slate-200 h-[34px] block">
+                </div>
+                <div class="space-y-1">
+                    <label class="text-[9px] text-slate-500 font-bold uppercase">App Version</label>
+                    <input type="text" id="u-ver" placeholder="vX.X.X" class="w-full bg-slate-900 border border-slate-700 rounded px-2 py-1.5 text-xs focus:border-blue-500 outline-none h-[34px]">
+                </div>
+                <div class="space-y-1">
+                    <!-- Remarks dynamically restricted and mapped specifically to ENG. REMARKS column -->
+                    <label class="text-[9px] text-slate-500 font-bold uppercase">Remarks</label>
+                    <input type="text" id="u-rem" placeholder="Optional" class="w-full bg-slate-900 border border-slate-700 rounded px-2 py-1.5 text-xs focus:border-blue-500 outline-none h-[34px]">
+                </div>
+                <div class="flex items-end">
+                    <button id="btn-submit" onclick="submitUpdate()" class="w-full bg-blue-600 hover:bg-blue-500 px-4 py-2 rounded font-bold text-[10px] uppercase transition-all shadow-lg text-white h-[34px] flex items-center justify-center">Update</button>
+                </div>
+            </div>
+        </section>
+    </div>
+
+    <!-- Custom Glassmorphism Warning Dialog (Replaces native alerts) -->
+    <div id="warning-modal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4 z-50 hidden opacity-0 transition-opacity duration-300">
+        <div class="glass-card max-w-md w-full p-6 border border-rose-500/30 shadow-[0_0_50px_rgba(244,63,94,0.15)] transform scale-95 transition-transform duration-300" id="warning-modal-content">
+            <div class="flex items-center gap-3 text-rose-500 mb-4">
+                <div class="w-10 h-10 rounded-full bg-rose-500/10 flex items-center justify-center">
+                    <i class="fas fa-exclamation-triangle text-lg animate-pulse"></i>
+                </div>
+                <div>
+                    <h3 class="text-xs font-black uppercase tracking-widest text-slate-100">Rollout Already Logged</h3>
+                    <p class="text-[9px] text-rose-400 font-bold uppercase tracking-wider">Blocked Secondary Push</p>
+                </div>
+            </div>
+            
+            <p class="text-[11px] text-slate-300 mb-4 leading-relaxed">
+                This transaction has been blocked because deployment data has already been updated for this terminal in the registry. 
+            </p>
+
+            <div class="bg-slate-900/50 rounded-lg p-3 border border-slate-800 space-y-2 mb-6 text-[10px]">
+                <div class="flex justify-between items-center py-1 border-b border-slate-800/50">
+                    <span class="text-slate-500 font-bold uppercase">Terminal TID</span> 
+                    <span id="w-modal-tid" class="font-mono text-blue-400 font-bold"></span>
+                </div>
+                <div class="flex justify-between items-center py-1 border-b border-slate-800/50">
+                    <span class="text-slate-500 font-bold uppercase">Roll-out By</span> 
+                    <span id="w-modal-by" class="text-slate-200 font-medium"></span>
+                </div>
+                <div class="flex justify-between items-center py-1 border-b border-slate-800/50">
+                    <span class="text-slate-500 font-bold uppercase">Roll-out Date</span> 
+                    <span id="w-modal-date" class="text-slate-200 font-medium"></span>
+                </div>
+                <div class="flex justify-between items-center py-1">
+                    <span class="text-slate-500 font-bold uppercase">App Version</span> 
+                    <span id="w-modal-ver" class="text-slate-200 font-medium"></span>
+                </div>
+            </div>
+
+            <div class="flex justify-end">
+                <button onclick="closeWarningModal()" class="bg-rose-600 hover:bg-rose-500 text-white font-bold text-[9px] uppercase tracking-widest px-6 py-2.5 rounded-lg transition-all shadow-lg active:scale-95">Dismiss Warning</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Notification -->
+    <div id="toast" class="fixed bottom-8 left-1/2 -translate-x-1/2 px-8 py-3 rounded-xl text-white text-[11px] font-black uppercase tracking-widest transition-all duration-300 opacity-0 pointer-events-none z-50 shadow-2xl"></div>
+
+    <script>
+        const BASE_API_URL = `https://script.google.com/macros/s/AKfycbzmoK0S-mMk_Eu2NjREedTR31mJiK_C2JULsh1ibC3U7SEX2F88gswXr-I6v-q9lhgmeQ/exec`;
+
+        let allSheetsData = {};
+        let sheetHeaders = {};
+        let currentSheet = '';
+        let filteredData = [];
+        let currentPage = 1;
+        const pageSize = 50; 
+
+        // String formatting helpers
+        const cleanStr = (val) => String(val || '').replace(/[^a-zA-Z0-9]/g, '').toUpperCase().trim();
+
+        // Standardized visual Date formatting parser. Displays dates like "26-Feb-24"
+        function formatDateReadable(dateStr) {
+            if (!dateStr || String(dateStr).trim() === '-' || String(dateStr).trim() === '') return '-';
+            try {
+                const date = new Date(dateStr);
+                if (isNaN(date.getTime())) return dateStr;
+                const day = String(date.getDate()).padStart(2, '0');
+                const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+                const month = months[date.getMonth()];
+                const year = String(date.getFullYear()).slice(-2);
+                return `${day}-${month}-${year}`;
+            } catch(e) { 
+                return dateStr; 
+            }
+        }
+
+        // Custom parser to format dates to standard YYYY-MM-DD required by input[type="date"]
+        function formatDateToYYYYMMDD(dateStr) {
+            if (!dateStr || String(dateStr).trim() === '-' || String(dateStr).trim() === '') return '';
+            try {
+                const date = new Date(dateStr);
+                if (isNaN(date.getTime())) return '';
+                const yyyy = date.getFullYear();
+                const mm = String(date.getMonth() + 1).padStart(2, '0');
+                const dd = String(date.getDate()).padStart(2, '0');
+                return `${yyyy}-${mm}-${dd}`;
+            } catch(e) {
+                return '';
+            }
+        }
+
+        // Clock utilities - Standard 12-hour AM/PM format update
+        function updateClock() {
+            const now = new Date();
+            document.getElementById('digital-clock').textContent = now.toLocaleTimeString('en-US', { hour12: true });
+            document.getElementById('digital-date').textContent = now.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
+        }
+        setInterval(updateClock, 1000);
+        updateClock();
+
+        function setStatus(msg, colorClass) {
+            document.getElementById('status-label').textContent = msg;
+            document.getElementById('status-dot').className = `w-2 h-2 rounded-full ${colorClass}`;
+        }
+
+        function showToast(msg, color) {
+            const t = document.getElementById('toast');
+            t.textContent = msg;
+            t.className = `fixed bottom-8 left-1/2 -translate-x-1/2 px-8 py-3 rounded-xl text-white text-[11px] font-black uppercase tracking-widest transition-all z-50 shadow-2xl ${color}`;
+            t.style.opacity = '1';
+            setTimeout(() => t.style.opacity = '0', 4000);
+        }
+
+        function showWarningModal(tid, by, date, ver) {
+            document.getElementById('w-modal-tid').textContent = tid;
+            document.getElementById('w-modal-by').textContent = by || 'N/A';
+            document.getElementById('w-modal-date').textContent = formatDateReadable(date);
+            document.getElementById('w-modal-ver').textContent = ver || 'N/A';
+            
+            const modal = document.getElementById('warning-modal');
+            const content = document.getElementById('warning-modal-content');
+            
+            modal.classList.remove('hidden');
+            setTimeout(() => {
+                modal.classList.remove('opacity-0');
+                content.classList.remove('scale-95');
+            }, 10);
+        }
+
+        function closeWarningModal() {
+            const modal = document.getElementById('warning-modal');
+            const content = document.getElementById('warning-modal-content');
+            
+            modal.classList.add('opacity-0');
+            content.classList.add('scale-95');
+            setTimeout(() => {
+                modal.classList.add('hidden');
+            }, 300);
+        }
+
+        function fetchSheetData() {
+            setStatus('Syncing...', 'bg-blue-500 animate-pulse status-syncing');
+            const icon = document.getElementById('sync-icon');
+            if (icon) icon.classList.add('fa-spin');
+            
+            const callback = 'cb_' + Date.now();
+            window[callback] = (res) => {
+                if (icon) icon.classList.remove('fa-spin');
+                if (!res) {
+                    setStatus('Error', 'bg-rose-500');
+                    return;
+                }
+
+                const rawData = res.data || res;
+                allSheetsData = {};
+                sheetHeaders = {};
+
+                Object.keys(rawData).forEach(name => {
+                    const rows = rawData[name];
+                    if (Array.isArray(rows) && rows.length > 0) {
+                        sheetHeaders[name] = rows[0];
+                        allSheetsData[name] = rows.slice(1);
+                    }
+                });
+
+                const names = Object.keys(allSheetsData);
+                if (names.length > 0) {
+                    setStatus('Connected', 'bg-emerald-500');
+                    if (!currentSheet || !allSheetsData[currentSheet]) currentSheet = names[0];
+                    renderUI(names);
+                    switchSheet(currentSheet);
+                } else {
+                    setStatus('Empty Data', 'bg-amber-500');
+                }
+                
+                // Updates synchronization label using active 12-hour clock
+                document.getElementById('last-update-time').textContent = `SYNC: ${new Date().toLocaleTimeString('en-US', { hour12: true })}`;
+                delete window[callback];
+                const sc = document.getElementById('jsonp-' + callback);
+                if(sc) sc.remove();
+            };
+
+            const script = document.createElement('script');
+            script.id = 'jsonp-' + callback;
+            script.src = `${BASE_API_URL}?action=fetchData&callback=${callback}&_t=${Date.now()}`;
+            script.onerror = () => {
+                setStatus('Failed', 'bg-rose-600');
+                showToast("Connection Refused", "bg-rose-600");
+                if (icon) icon.classList.remove('fa-spin');
+            };
+            document.body.appendChild(script);
+        }
+
+        function renderUI(names) {
+            const tabs = document.getElementById('tabs-container');
+            const select = document.getElementById('u-sheet');
+            const stats = document.getElementById('stats-grid');
+            
+            const prevSelectVal = select.value;
+            tabs.innerHTML = ''; select.innerHTML = ''; stats.innerHTML = '';
+
+            names.forEach(name => {
+                const btn = document.createElement('button');
+                btn.className = `tab-btn ${name === currentSheet ? 'active' : ''}`;
+                btn.setAttribute('data-sheet-name', name);
+                btn.textContent = name;
+                btn.onclick = () => switchSheet(name);
+                tabs.appendChild(btn);
+
+                const opt = document.createElement('option');
+                opt.value = name; opt.textContent = name;
+                select.appendChild(opt);
+
+                const card = document.createElement('div');
+                card.className = "glass-card p-2 border-b-2 border-blue-500 cursor-pointer hover:bg-slate-800/50 transition-all";
+                card.onclick = () => switchSheet(name);
+                card.innerHTML = `<p class="text-[8px] uppercase opacity-60 truncate">${name}</p><p class="text-sm font-black">${allSheetsData[name].length}</p>`;
+                stats.appendChild(card);
+            });
+
+            // Keep correct dropdown target synchronized
+            if (prevSelectVal && names.includes(prevSelectVal)) {
+                select.value = prevSelectVal;
+            } else if (currentSheet) {
+                select.value = currentSheet;
+            }
+        }
+
+        function switchSheet(name) {
+            currentSheet = name;
+            document.querySelectorAll('.tab-btn').forEach(b => {
+                b.classList.toggle('active', b.getAttribute('data-sheet-name') === name);
+            });
+            
+            // Auto select sheet inside update dropdown matching clicked sheet tab exactly
+            const selectDropdown = document.getElementById('u-sheet');
+            if (selectDropdown) {
+                selectDropdown.value = name;
+            }
+
+            filteredData = [...(allSheetsData[name] || [])];
+            currentPage = 1;
+            renderTable();
+            handleTIDLookup();
+        }
+
+        function renderTable() {
+            const head = document.getElementById('terminalTableHeader');
+            const body = document.getElementById('terminalTableBody');
+            const headers = sheetHeaders[currentSheet] || [];
+
+            head.innerHTML = `<tr>${headers.map(h => {
+                const isAddressCol = String(h || '').toUpperCase().includes('ADDRESS');
+                const extraStyle = isAddressCol ? 'min-w-[400px] max-w-[500px]' : '';
+                return `<th class="p-2 bg-slate-800 border-b border-slate-700 text-slate-400 uppercase font-bold tracking-wider ${h === 'TID' ? 'sticky-col' : ''} ${extraStyle}">${h}</th>`;
+            }).join('')}</tr>`;
+            
+            const totalPages = Math.ceil(filteredData.length / pageSize) || 1;
+            const pageData = filteredData.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+
+            body.innerHTML = pageData.length ? pageData.map(row => `
+                <tr class="hover:bg-slate-800/40 border-b border-slate-800/20 transition-colors">
+                    ${row.map((cell, idx) => {
+                        const colName = String(headers[idx] || '').toUpperCase();
+                        const isTID = colName === 'TID';
+                        const isDateCol = colName.includes('DATE');
+                        const isAddressCol = colName.includes('ADDRESS');
+                        
+                        // Dynamically format cells inside Date columns
+                        const cellVal = isDateCol ? formatDateReadable(cell) : (cell || '-');
+                        
+                        // Address column formatting: Expanded column width showing full address up to 2 lines without ellipsis cutting it off
+                        if (isAddressCol) {
+                            return `<td class="p-2 min-w-[400px] max-w-[500px]">
+                                <div class="whitespace-normal break-words leading-relaxed">
+                                    ${cellVal}
+                                </div>
+                            </td>`;
+                        }
+                        
+                        return `<td class="p-2 ${isTID ? 'text-blue-400 font-bold sticky-col' : ''}">${cellVal}</td>`;
+                    }).join('')}
+                </tr>
+            `).join('') : '<tr><td colspan="30" class="p-10 text-center text-slate-500">No records found in this sheet.</td></tr>';
+            
+            document.getElementById('page-info').textContent = `Page ${currentPage} of ${totalPages}`;
+            document.getElementById('result-count').textContent = `${filteredData.length} Results`;
+            document.getElementById('prev-btn').disabled = currentPage === 1;
+            document.getElementById('next-btn').disabled = currentPage === totalPages || totalPages === 0;
+        }
+
+        function handleSearch() {
+            const query = document.getElementById('tableSearch').value.toLowerCase().trim();
+            const baseData = allSheetsData[currentSheet] || [];
+            filteredData = query ? baseData.filter(row => row.some(cell => String(cell).toLowerCase().includes(query))) : [...baseData];
+            currentPage = 1;
+            renderTable();
+        }
+
+        function changePage(dir) {
+            currentPage += dir;
+            renderTable();
+            document.querySelector('.table-container').scrollTop = 0;
+        }
+
+        function handleTIDLookup() {
+            const tid = document.getElementById('u-tid').value.trim().toUpperCase();
+            const indicator = document.getElementById('lookup-indicator');
+            const targetSheet = document.getElementById('u-sheet').value;
+            const dataRows = allSheetsData[targetSheet] || [];
+            const headers = sheetHeaders[targetSheet] || [];
+            const tidIdx = headers.indexOf('TID');
+
+            // Find indexes flexibly using case-insensitive matches
+            const rByIdx = headers.findIndex(h => {
+                const up = String(h || '').toUpperCase().trim();
+                return up === 'ROLL-OUT BY' || up === 'ROLLOUT BY';
+            });
+            const rDateIdx = headers.findIndex(h => {
+                const up = String(h || '').toUpperCase().trim();
+                return up === 'ROLL-OUT DATE' || up === 'ROLLOUT DATE';
+            });
+            const verIdx = headers.findIndex(h => {
+                const up = String(h || '').toUpperCase().trim();
+                return up === 'APP. VERSION' || up === 'APP VERSION' || up === 'VERSION';
+            });
+            const remIdx = headers.findIndex(h => {
+                const up = String(h || '').toUpperCase().trim();
+                return up === 'ENG. REMARKS'; // Strictly matches ENG. REMARKS only
+            });
+
+            if (!tid || tidIdx === -1) {
+                indicator.style.opacity = '0';
+                ['u-rby', 'u-rdate', 'u-ver', 'u-rem'].forEach(id => document.getElementById(id).value = '');
+                return;
+            }
+
+            const match = dataRows.find(r => String(r[tidIdx]).toUpperCase() === tid);
+            if (match) {
+                indicator.style.opacity = '1';
+                indicator.textContent = "TID MATCH FOUND";
+                indicator.className = "text-[8px] font-bold uppercase px-2 py-0.5 rounded bg-blue-500/20 text-blue-400";
+
+                // Auto-populate the matched details into input fields
+                if (rByIdx !== -1) document.getElementById('u-rby').value = match[rByIdx] || '';
+                if (rDateIdx !== -1) document.getElementById('u-rdate').value = formatDateToYYYYMMDD(match[rDateIdx]);
+                if (verIdx !== -1) document.getElementById('u-ver').value = match[verIdx] || '';
+                if (remIdx !== -1) document.getElementById('u-rem').value = match[remIdx] || '';
+            } else {
+                indicator.style.opacity = '1';
+                indicator.textContent = "TID NOT FOUND";
+                indicator.className = "text-[8px] font-bold uppercase px-2 py-0.5 rounded bg-rose-500/10 text-rose-500";
+                
+                // Clear fields if TID not found
+                ['u-rby', 'u-rdate', 'u-ver', 'u-rem'].forEach(id => document.getElementById(id).value = '');
+            }
+        }
+
+        function submitUpdate() {
+            const sheetName = document.getElementById('u-sheet').value;
+            const tid = document.getElementById('u-tid').value.trim().toUpperCase();
+            const rollDate = document.getElementById('u-rdate').value;
+            const rollBy = document.getElementById('u-rby').value.trim();
+            const version = document.getElementById('u-ver').value.trim();
+            const remarks = document.getElementById('u-rem').value.trim();
+
+            if (!tid || !rollDate) {
+                return showToast("TID & Date Required", "bg-rose-600");
+            }
+
+            // [DOUBLE-PUSH PROTECTION GUARD]
+            // Verify if Roll-out By, Roll-out Date, and App Version are identical to what is already populated.
+            // Block ONLY if all 3 values are exactly the same. If any of these change, allow the update/overwrite.
+            if (allSheetsData[sheetName]) {
+                const headers = sheetHeaders[sheetName] || [];
+                const tidIdx = headers.indexOf('TID');
+                
+                const rByIdx = headers.findIndex(h => {
+                    const up = String(h || '').toUpperCase().trim();
+                    return up === 'ROLL-OUT BY' || up === 'ROLLOUT BY';
+                });
+                const rDateIdx = headers.findIndex(h => {
+                    const up = String(h || '').toUpperCase().trim();
+                    return up === 'ROLL-OUT DATE' || up === 'ROLLOUT DATE';
+                });
+                const verIdx = headers.findIndex(h => {
+                    const up = String(h || '').toUpperCase().trim();
+                    return up === 'APP. VERSION' || up === 'APP VERSION' || up === 'VERSION';
+                });
+
+                if (tidIdx !== -1) {
+                    const existingRow = allSheetsData[sheetName].find(r => String(r[tidIdx]).toUpperCase() === tid);
+                    if (existingRow) {
+                        const existingBy = rByIdx !== -1 ? String(existingRow[rByIdx] || '').trim() : '';
+                        const existingDate = rDateIdx !== -1 ? String(existingRow[rDateIdx] || '').trim() : '';
+                        const existingVer = verIdx !== -1 ? String(existingRow[verIdx] || '').trim() : '';
+
+                        // Normalize dates and text strings for an accurate comparison
+                        const normalizedExistingDate = formatDateToYYYYMMDD(existingDate);
+                        const normalizedRollDate = formatDateToYYYYMMDD(rollDate);
+
+                        const isSameBy = cleanStr(existingBy) === cleanStr(rollBy);
+                        const isSameDate = normalizedExistingDate === normalizedRollDate;
+                        const isSameVer = cleanStr(existingVer) === cleanStr(version);
+
+                        // Block submission ONLY if there is no change in any of the core attributes
+                        if (isSameBy && isSameDate && isSameVer) {
+                            showWarningModal(tid, existingBy, existingDate, existingVer);
+                            return; // Strictly halts execution, stopping the identical second push
+                        }
+                    }
+                }
+            }
+
+            const btn = document.getElementById('btn-submit');
+            btn.disabled = true; 
+            btn.textContent = "Syncing...";
+
+            const params = {
+                action: 'updateDeployment',
+                sheetName: sheetName,
+                tid: tid,
+                rollBy: rollBy,
+                rollDate: rollDate,
+                version: version,
+                remarks: remarks // Maps strictly to ENG. REMARKS in backend target
+            };
+
+            const callbackName = 'upd_' + Date.now();
+            params.callback = callbackName;
+
+            // Optimistic Update: Render changes immediately locally
+            let updatedLocal = false;
+            if (allSheetsData[sheetName]) {
+                const headers = sheetHeaders[sheetName] || [];
+                const tidIdx = headers.indexOf('TID');
+                const dateIdx = headers.indexOf('Roll-out Date');
+                const byIdx = headers.indexOf('Roll-out By');
+                const verIdx = headers.indexOf('App Version');
+                
+                // Strictly match ENG. REMARKS column header
+                const remIdx = headers.findIndex(h => {
+                    const up = String(h || '').toUpperCase().trim();
+                    return up === 'ENG. REMARKS';
+                });
+
+                if (tidIdx !== -1) {
+                    const matchIndex = allSheetsData[sheetName].findIndex(r => String(r[tidIdx]).toUpperCase() === tid);
+                    if (matchIndex !== -1) {
+                        if (dateIdx !== -1) allSheetsData[sheetName][matchIndex][dateIdx] = rollDate;
+                        if (byIdx !== -1) allSheetsData[sheetName][matchIndex][byIdx] = rollBy;
+                        if (verIdx !== -1) allSheetsData[sheetName][matchIndex][verIdx] = version;
+                        if (remIdx !== -1) allSheetsData[sheetName][matchIndex][remIdx] = remarks;
+                        updatedLocal = true;
+                    }
+                }
+            }
+
+            const timeoutId = setTimeout(() => {
+                if (window[callbackName]) {
+                    cleanupAndResolve({ success: true, message: "Request processed. Verifying changes..." });
+                }
+            }, 5500);
+
+            function cleanupAndResolve(res) {
+                clearTimeout(timeoutId);
+                btn.disabled = false; 
+                btn.textContent = "Update";
+
+                if (res && res.success) {
+                    showToast("Update Transmitted Successfully", "bg-emerald-600");
+                    if (updatedLocal) {
+                        if (currentSheet === sheetName) {
+                            renderTable();
+                        }
+                    }
+                    setTimeout(fetchSheetData, 1000);
+                    ['u-tid', 'u-rby', 'u-rdate', 'u-ver', 'u-rem'].forEach(id => document.getElementById(id).value = '');
+                    document.getElementById('lookup-indicator').style.opacity = '0';
+                } else {
+                    showToast(res?.message || "Sync encountered a network issue", "bg-rose-600");
+                }
+                
+                delete window[callbackName];
+                const sc = document.getElementById('jsonp-upd');
+                if(sc) sc.remove();
+            }
+
+            window[callbackName] = cleanupAndResolve;
+
+            const script = document.createElement('script');
+            script.id = 'jsonp-upd';
+            const query = Object.keys(params).map(k => `${k}=${encodeURIComponent(params[k])}`).join('&');
+            script.src = `${BASE_API_URL}?${query}`;
+            script.onerror = () => {
+                fetch(`${BASE_API_URL}?${query}`, { mode: 'no-cors' })
+                    .then(() => {
+                        cleanupAndResolve({ success: true, message: "Update sent (no-cors fallback)" });
+                    })
+                    .catch(() => {
+                        cleanupAndResolve({ success: false, message: "Update failed to send" });
+                    });
+            };
+            document.body.appendChild(script);
+        }
+
+        window.onload = fetchSheetData;
+    </script>
+</body>
+</html>
