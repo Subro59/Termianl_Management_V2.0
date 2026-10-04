@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Terminal Management System V18</title>
+    <title>Terminal Management System V19</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
@@ -162,7 +162,7 @@
     <div class="max-w-full mx-auto space-y-3">
         <header class="flex flex-row justify-between items-start border-b border-slate-800 pb-3">
             <div class="pr-2">
-                <h1 class="text-xl md:text-2xl font-black bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-cyan-400">Terminal Dashboard V18</h1>
+                <h1 class="text-xl md:text-2xl font-black bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-cyan-400">Terminal Dashboard V19</h1>
                 <div class="flex items-center gap-3 mt-1">
                     <p id="status-text" class="text-slate-400 text-[8px] md:text-[9px] font-bold uppercase flex items-center gap-2">
                         <span id="status-dot" class="w-2 h-2 rounded-full bg-slate-500"></span>
@@ -635,7 +635,13 @@
             const row = filteredData[rowIndex];
             const headers = sheetHeaders[currentSheet] || [];
             const tidIdx = headers.findIndex(h => h?.toUpperCase() === 'TID');
-            const dbaIdx = headers.findIndex(h => h?.toUpperCase() === 'DBA NAME' || h?.toUpperCase() === 'MERCHANT NAME');
+            
+            // Prioritize 'DBA NAME' over 'MERCHANT NAME'
+            let dbaIdx = headers.findIndex(h => h?.toUpperCase() === 'DBA NAME');
+            if (dbaIdx === -1) {
+                dbaIdx = headers.findIndex(h => h?.toUpperCase() === 'MERCHANT NAME');
+            }
+
             const addrIdx = headers.findIndex(h => h?.toUpperCase() === 'ADDRESS');
             const tidValue = tidIdx !== -1 ? (row[tidIdx] || '-') : '-';
             const mNameValue = dbaIdx !== -1 ? (row[dbaIdx] || '-') : '-';
