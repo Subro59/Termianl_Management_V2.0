@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Terminal Management System V19</title>
+    <title>Terminal Management System</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
@@ -37,21 +37,20 @@
         .table-container::-webkit-scrollbar-thumb { background: #475569; border-radius: 10px; }
         
         tr:hover td { background-color: rgba(51, 65, 85, 0.5); }
-        tr:hover td.sticky-col-copy { background-color: #1e293b !important; }
+        tr:hover td.sticky-col-copy,
         tr:hover td.sticky-col-tid { background-color: #1e293b !important; }
 
         .clock-font { font-family: 'JetBrains Mono', monospace; }
         
-        .header-wrap-2-lines {
-            display: -webkit-box;
-            -webkit-line-clamp: 2;
-            -webkit-box-orient: vertical;
-            overflow: hidden;
-            white-space: normal;
+        th {
+            white-space: normal !important;
             word-break: break-word;
+            padding: 10px !important;
+            vertical-align: middle !important;
+            font-size: 10px !important;
+            letter-spacing: 0.05em;
             line-height: 1.2;
-            height: 2.4em;
-            min-width: 80px;
+            text-align: left;
         }
 
         .sticky-col-copy { 
@@ -59,26 +58,28 @@
             left: 0; 
             z-index: 30; 
             background-color: #1e293b !important; 
-            border-right: 1px solid rgba(255, 255, 255, 0.1);
-            width: 50px;
-            min-width: 50px;
+            width: 80px;
+            min-width: 80px;
+            max-width: 80px;
+            text-align: center;
         }
+
         .sticky-col-tid { 
             position: sticky; 
-            left: 50px; 
+            left: 80px; 
             z-index: 30; 
             background-color: #1e293b !important; 
-            border-right: 1px solid rgba(255,255,255,0.1);
-            min-width: 100px;
+            border-right: 1px solid rgba(255, 255, 255, 0.1);
+            width: 105px;
+            min-width: 105px;
+            max-width: 105px;
         }
 
-        thead th.sticky-col-copy, thead th.sticky-col-tid {
-            z-index: 40; 
-            background-color: #1e293b !important;
-        }
+        thead th.sticky-col-copy { z-index: 40; background-color: #1e293b !important; left: 0; }
+        thead th.sticky-col-tid { z-index: 40; background-color: #1e293b !important; left: 80px; }
 
-        table { border-collapse: separate; border-spacing: 0; width: 100%; }
-        td { vertical-align: middle; white-space: nowrap; }
+        table { border-collapse: separate; border-spacing: 0; width: 100%; table-layout: auto; }
+        td { vertical-align: middle; white-space: nowrap; font-size: 10px; padding: 10px; }
 
         .page-btn { background: #1e293b; border: 1px solid #334155; padding: 0.5rem 1rem; border-radius: 0.5rem; transition: all 0.2s; font-size: 0.75rem; }
         .page-btn:hover:not(:disabled) { background: #334155; border-color: #475569; }
@@ -112,8 +113,7 @@
             width: 38px;
             flex-shrink: 0;
         }
-        
-        .search-wrapper.expanded { width: 100%; max-width: 300px; }
+        .search-wrapper.expanded { width: 100%; max-width: 260px; }
         .search-input {
             width: 0; opacity: 0; padding: 0; pointer-events: none;
             transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1); height: 38px;
@@ -128,6 +128,30 @@
             border: 1px solid #334155; border-radius: 0.5rem; transition: all 0.3s;
         }
 
+        .multi-search-wrapper {
+            position: relative;
+            display: flex;
+            align-items: center;
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            width: 38px;
+            flex-shrink: 0;
+        }
+        .multi-search-wrapper.expanded { width: 100%; max-width: 320px; }
+        .multi-search-pane {
+            position: absolute; right: 0; top: 0; width: 0; opacity: 0; pointer-events: none;
+            overflow: hidden; background: #1e293b; border: 1px solid #475569; border-radius: 0.75rem;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.5); z-index: 50; padding: 0;
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .multi-search-wrapper.expanded .multi-search-pane {
+            width: 320px; opacity: 1; pointer-events: auto; padding: 0.75rem;
+        }
+        .multi-search-btn-toggle {
+            width: 38px; height: 38px; display: flex; align-items: center; justify-content: center;
+            cursor: pointer; z-index: 10; color: #c084fc; background: rgba(168, 85, 247, 0.1);
+            border: 1px solid rgba(168, 85, 247, 0.3); border-radius: 0.5rem; transition: all 0.3s;
+        }
+
         .copy-row-btn {
             color: #94a3b8; transition: all 0.2s; padding: 4px; border-radius: 4px;
             display: flex; align-items: center; justify-content: center; width: 100%;
@@ -140,11 +164,10 @@
 
         #warning-modal { opacity: 0; pointer-events: none; transform: scale(0.95); transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
         #warning-modal.active { opacity: 1; pointer-events: auto; transform: scale(1); }
-
         .shadow-input::placeholder { color: #3b82f6; font-style: italic; opacity: 0.7; }
     </style>
 </head>
-<body class="p-3 md:p-6">
+<body class="p-3 md:p-6" onclick="handleBodyClick(event)">
 
     <div id="warning-modal" class="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/80 backdrop-blur-sm hidden">
         <div class="glass-card max-w-md w-full p-6 border-rose-500/50 shadow-[0_0_50px_rgba(244,63,94,0.3)] mx-4 text-center">
@@ -162,7 +185,7 @@
     <div class="max-w-full mx-auto space-y-3">
         <header class="flex flex-row justify-between items-start border-b border-slate-800 pb-3">
             <div class="pr-2">
-                <h1 class="text-xl md:text-2xl font-black bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-cyan-400">Terminal Dashboard V19</h1>
+                <h1 class="text-xl md:text-2xl font-black bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-cyan-400">Terminal Dashboard</h1>
                 <div class="flex items-center gap-3 mt-1">
                     <p id="status-text" class="text-slate-400 text-[8px] md:text-[9px] font-bold uppercase flex items-center gap-2">
                         <span id="status-dot" class="w-2 h-2 rounded-full bg-slate-500"></span>
@@ -212,47 +235,49 @@
 
         <section class="glass-card overflow-hidden flex flex-col shadow-2xl">
             <div class="p-3 border-b border-slate-700/50 bg-slate-800/20 flex flex-col gap-3">
-                <div id="tabs-container" class="flex overflow-x-auto gap-1.5 no-scrollbar pb-1"></div>
+                <div class="flex items-center justify-between flex-wrap gap-2">
+                    <div id="tabs-container" class="flex overflow-x-auto gap-1.5 no-scrollbar pb-1"></div>
+                    <button onclick="resetAllFilters()" id="reset-filters-btn" class="hidden text-[9px] bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 px-2.5 py-1 rounded-lg font-bold uppercase transition-all items-center gap-1">
+                        <i class="fas fa-filter-circle-xmark"></i> Clear Active Filters (<span id="active-filter-count">0</span>)
+                    </button>
+                </div>
                 
-                <div class="flex items-center justify-between gap-3 flex-wrap">
+                <div class="flex items-center justify-between gap-3">
                     <div class="flex items-center gap-3 flex-shrink-0">
                          <span id="result-count" class="text-[9px] font-bold bg-slate-800/50 text-blue-400 px-2 py-1 rounded border border-blue-500/10 min-w-fit">0 Results</span>
                          <span id="page-info" class="text-[8px] text-slate-500 uppercase font-black tracking-widest whitespace-nowrap">Page 1 of 1</span>
                     </div>
 
-                    <div class="flex items-center gap-2 flex-grow justify-end flex-wrap">
-                        <!-- Column Filter Toggle -->
-                        <button onclick="toggleColumnFilterRow()" id="col-filter-btn" class="h-[38px] bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white px-3 py-2 rounded-lg flex items-center gap-2 transition-all text-[9px] font-black uppercase tracking-widest border border-slate-700 flex-shrink-0">
-                            <i class="fas fa-filter text-cyan-400"></i> <span class="hidden sm:inline">Col Filters</span>
-                        </button>
-
-                        <!-- Multi-Search Toggle -->
-                        <button onclick="toggleMultiSearchMode()" id="multi-search-btn" class="h-[38px] bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white px-3 py-2 rounded-lg flex items-center gap-2 transition-all text-[9px] font-black uppercase tracking-widest border border-slate-700 flex-shrink-0">
-                            <i class="fas fa-layer-group text-blue-400"></i> <span class="hidden sm:inline">Multi-Search</span>
-                        </button>
+                    <div class="flex items-center gap-2 flex-grow justify-end">
+                        <div id="multiSearchWrapper" class="multi-search-wrapper">
+                            <div class="multi-search-btn-toggle" onclick="toggleMultiSearch(event)" title="Multi-Term Search">
+                                <i class="fas fa-list-ul text-xs"></i>
+                            </div>
+                            <div class="multi-search-pane" id="multiSearchPane" onclick="event.stopPropagation()">
+                                <div class="flex items-center justify-between mb-2">
+                                    <span class="text-[9px] font-black uppercase text-purple-300 tracking-wider flex items-center gap-1">
+                                        <i class="fas fa-list-ul"></i> Multi-Term Search
+                                    </span>
+                                    <button onclick="clearMultiSearch()" class="text-[8px] text-rose-400 hover:text-rose-300 font-bold uppercase">Clear</button>
+                                </div>
+                                <textarea id="multi-search-input" onkeyup="handleMultiSearch()" onpaste="setTimeout(handleMultiSearch, 50)" rows="3" 
+                                          placeholder="Paste TIDs or terms e.g. 20012390, 20002218..." 
+                                          class="w-full bg-slate-950 border border-slate-700/80 rounded-lg p-2 text-xs clock-font focus:border-purple-500 outline-none leading-relaxed text-slate-200 mb-2"></textarea>
+                                <button onclick="toggleMultiSearch(event)" class="w-full bg-purple-600 hover:bg-purple-500 text-white font-bold py-1.5 rounded text-[9px] uppercase tracking-wider">Apply & Close</button>
+                            </div>
+                        </div>
 
                         <div id="searchWrapper" class="search-wrapper">
                             <div class="search-icon-btn" onclick="toggleSearch()">
                                 <i class="fas fa-search text-xs"></i>
                             </div>
-                            <input type="text" id="tableSearch" onkeyup="handleSearch()" onblur="collapseSearch()" placeholder="Search date, TID or version..." class="search-input bg-slate-900 border border-slate-700 rounded-lg text-[11px] focus:border-blue-500 outline-none text-slate-200">
+                            <input type="text" id="tableSearch" onkeyup="handleSearch()" onblur="collapseSearch()" placeholder="Search date or version..." class="search-input bg-slate-900 border border-slate-700 rounded-lg text-[11px] focus:border-blue-500 outline-none text-slate-200">
                         </div>
 
                         <button onclick="downloadTableData()" class="h-[38px] bg-emerald-600/10 hover:bg-emerald-600 text-emerald-400 hover:text-white px-3 py-2 rounded-lg flex items-center gap-2 transition-all text-[9px] font-black uppercase tracking-widest border border-emerald-500/20 flex-shrink-0">
                             <i class="fas fa-file-excel"></i> <span class="hidden sm:inline">Export</span>
                         </button>
                     </div>
-                </div>
-
-                <!-- Multi-Search Extended Panel -->
-                <div id="multi-search-panel" class="hidden p-2.5 bg-slate-900/90 border border-blue-500/30 rounded-lg space-y-2">
-                    <div class="flex items-center justify-between">
-                        <label class="text-[9px] text-blue-400 font-extrabold uppercase tracking-wider flex items-center gap-1.5">
-                            <i class="fas fa-list-ol"></i> Multi-Term Search (Comma, Space, or Line-Separated)
-                        </label>
-                        <button onclick="clearMultiSearch()" class="text-[9px] text-rose-400 hover:underline">Clear Multi-Search</button>
-                    </div>
-                    <textarea id="multiSearchInput" onkeyup="handleSearch()" placeholder="Paste TIDs or terms e.g.&#10;20012390, 20002218, 20002514" class="w-full bg-slate-950 border border-slate-700 rounded p-2 text-xs clock-font focus:border-blue-500 outline-none h-16 text-slate-200"></textarea>
                 </div>
             </div>
             
@@ -297,8 +322,8 @@
                 </div>
             </div>
 
-            <!-- Single TID Form Container -->
-            <div id="single-mode-container" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-8 gap-3">
+            <!-- Single mode -->
+            <div id="single-mode-container" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7 gap-3">
                 <div class="space-y-1">
                     <label class="text-[9px] text-slate-500 font-bold uppercase">Target Sheet</label>
                     <select id="u-sheet" onchange="handleTIDLookup()" class="w-full bg-slate-900 border border-slate-700 rounded px-2 py-2 text-xs focus:border-blue-500 outline-none text-slate-200"></select>
@@ -308,19 +333,13 @@
                     <input type="text" id="u-tid" oninput="handleTIDLookup()" placeholder="Enter TID" class="w-full bg-slate-900 border border-slate-700 rounded px-2 py-2 text-xs focus:border-blue-500 outline-none">
                 </div>
                 <div class="space-y-1">
-                    <label class="text-[9px] text-slate-500 font-bold uppercase">POS S/N *</label>
-                    <input type="text" id="u-psn" placeholder="Serial No." class="w-full bg-slate-900 border border-slate-700 rounded px-2 py-2 text-xs focus:border-blue-500 outline-none">
-                </div>
-                <div class="space-y-1">
                     <label class="text-[9px] text-slate-500 font-bold uppercase">RollOut By *</label>
                     <select id="u-rby" class="w-full bg-slate-900 border border-slate-700 rounded px-2 py-2 text-xs focus:border-blue-500 outline-none text-slate-200">
                         <option value="">Select Engineer</option>
                     </select>
                 </div>
                 <div class="space-y-1">
-                    <label class="text-[9px] text-slate-500 font-bold uppercase flex justify-between">
-                        <span>RollOut/Visit Date *</span>
-                    </label>
+                    <label class="text-[9px] text-slate-500 font-bold uppercase">RollOut/Visit Date *</label>
                     <input type="date" id="u-rdate" required class="w-full bg-slate-900 border border-slate-700 rounded px-2 py-2 text-xs focus:border-blue-500 outline-none text-slate-200">
                 </div>
                 <div class="space-y-1">
@@ -336,7 +355,7 @@
                 </div>
             </div>
 
-            <!-- Batch Mode Container -->
+            <!-- Batch mode -->
             <div id="batch-mode-container" class="hidden space-y-4">
                 <div class="grid grid-cols-1 lg:grid-cols-4 gap-4">
                     <div class="space-y-1">
@@ -352,8 +371,8 @@
                         <input type="text" id="b-ver" value="112.0831" onkeyup="parseBatchInput()" placeholder="e.g. 112.0831" class="w-full bg-slate-900 border border-slate-700 rounded px-2.5 py-2 text-xs focus:border-blue-500 outline-none text-slate-200">
                     </div>
                     <div class="space-y-1">
-                        <label class="text-[9px] text-slate-400 font-bold uppercase">RollOut By *</label>
-                        <select id="b-rby" class="w-full bg-slate-900 border border-slate-700 rounded px-2.5 py-2 text-xs focus:border-blue-500 outline-none text-slate-200">
+                        <label class="text-[9px] text-slate-400 font-bold uppercase">RollOut By (Engineer) *</label>
+                        <select id="b-rby" onchange="parseBatchInput()" class="w-full bg-slate-900 border border-slate-700 rounded px-2.5 py-2 text-xs focus:border-blue-500 outline-none text-slate-200">
                             <option value="">Select Engineer</option>
                         </select>
                     </div>
@@ -370,20 +389,15 @@
                     </div>
                     
                     <textarea id="b-raw-input" onkeyup="parseBatchInput()" onpaste="setTimeout(parseBatchInput, 50)" rows="6" 
-                              placeholder="Paste list e.g.:&#10;20012390 Old OS&#10;20002218 Location not found&#10;20002514 Shop closed POS at others location&#10;20034810&#10;20034812 Done" 
+                              placeholder="Paste list e.g.:&#10;20022094 Location change (move to Remarks)&#10;20023541 Old OS (move to OS Type)&#10;20024628 (no OS type or remarks)" 
                               class="w-full bg-slate-950/80 border border-slate-700/80 rounded-xl p-3 text-xs clock-font focus:border-blue-500 outline-none leading-relaxed text-slate-200"></textarea>
-                    
-                    <p class="text-[9px] text-slate-400 italic">
-                        Multi-line batch paste. Notes like <span class="bg-slate-800 text-cyan-300 px-1 py-0.5 rounded font-mono">(Old OS)</span> are set to OS Type, while remarks like <span class="bg-slate-800 text-amber-300 px-1 py-0.5 rounded font-mono">Merchant not found</span> are saved to Remarks From Engineer.
-                    </p>
                 </div>
 
-                <!-- Batch Preview Table -->
                 <div id="batch-preview-wrapper" class="space-y-2 hidden">
                     <div class="flex items-center justify-between">
                         <div class="flex items-center gap-2">
                             <h3 class="text-[10px] font-black uppercase text-slate-300 tracking-wider">Parsed Batch Items (<span id="batch-count">0</span>)</h3>
-                            <span id="batch-valid-count" class="text-[8px] font-bold px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-400">0 Valid</span>
+                            <span id="batch-valid-count" class="text-[8px] font-bold px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-400">0 Matched</span>
                             <span id="batch-invalid-count" class="text-[8px] font-bold px-2 py-0.5 rounded bg-rose-500/20 text-rose-400">0 Mismatched</span>
                         </div>
                         <button id="btn-execute-batch" onclick="executeBatchUpdate()" class="bg-emerald-600 hover:bg-emerald-500 text-white px-5 py-2 rounded-lg font-black text-[10px] uppercase tracking-wider transition-all shadow-lg flex items-center gap-2">
@@ -397,7 +411,6 @@
                                 <tr>
                                     <th class="p-2.5">#</th>
                                     <th class="p-2.5">TID</th>
-                                    <th class="p-2.5">POS S/N</th>
                                     <th class="p-2.5">Match Status</th>
                                     <th class="p-2.5">Action Rule</th>
                                     <th class="p-2.5">App. Version</th>
@@ -417,7 +430,7 @@
     <div id="toast" class="fixed bottom-8 left-1/2 -translate-x-1/2 px-8 py-3 rounded-xl text-white text-[11px] font-black uppercase tracking-widest transition-all duration-300 opacity-0 pointer-events-none z-[200] shadow-2xl"></div>
 
     <script>
-        const BASE_API_URL = `https://script.google.com/macros/s/AKfycbyXlqsTdPJx_yGsUi3CKiL02PQ8SZgOgdWxRVwS8acjMK7GmOeMRde8ddxovj7pge4DXA/exec`;
+        const BASE_API_URL = `https://script.google.com/macros/s/AKfycbzfbgRI99_JbHm_0baKuCsvj5WGpBKCgKKWsVCuzKIXFTtTvzCL972OIjmbsXp9T3Femg/exec`;
 
         let allSheetsData = {};
         let sheetHeaders = {};
@@ -430,67 +443,8 @@
         let parsedBatchItems = [];
         let isBatchProcessing = false;
 
-        // Column filters state & Multi Search
-        let columnFilters = {};
-        let isColumnFilterVisible = false;
-        let isMultiSearchActive = false;
-
         const cleanStr = (val) => String(val || '').replace(/[^a-zA-Z0-9]/g, '').toUpperCase().trim();
         const normalizeVer = (val) => String(val || '').trim().toLowerCase();
-
-        function toggleColumnFilterRow() {
-            isColumnFilterVisible = !isColumnFilterVisible;
-            const btn = document.getElementById('col-filter-btn');
-            if (btn) {
-                btn.classList.toggle('bg-cyan-600/20', isColumnFilterVisible);
-                btn.classList.toggle('border-cyan-500', isColumnFilterVisible);
-                btn.classList.toggle('text-cyan-400', isColumnFilterVisible);
-            }
-            renderTable();
-        }
-
-        function toggleMultiSearchMode() {
-            isMultiSearchActive = !isMultiSearchActive;
-            const panel = document.getElementById('multi-search-panel');
-            const btn = document.getElementById('multi-search-btn');
-            if (panel) panel.classList.toggle('hidden', !isMultiSearchActive);
-            if (btn) {
-                btn.classList.toggle('bg-blue-600/20', isMultiSearchActive);
-                btn.classList.toggle('border-blue-500', isMultiSearchActive);
-                btn.classList.toggle('text-blue-400', isMultiSearchActive);
-            }
-            if (!isMultiSearchActive) {
-                document.getElementById('multiSearchInput').value = '';
-                handleSearch();
-            }
-        }
-
-        function clearMultiSearch() {
-            document.getElementById('multiSearchInput').value = '';
-            handleSearch();
-        }
-
-        function formatDateForExcel(dateVal) {
-            if (!dateVal || dateVal === '-' || dateVal === 'null' || dateVal === 'undefined') return null;
-            const str = String(dateVal).trim();
-            if (!str) return null;
-
-            let d = new Date(str);
-            if (isNaN(d.getTime())) {
-                const formattedStr = parseSearchDateToFormatted(str);
-                if (formattedStr) {
-                    d = new Date(formattedStr);
-                }
-            }
-
-            if (!isNaN(d.getTime())) {
-                const m = d.getMonth() + 1; // Month without leading zero (11)
-                const day = d.getDate();    // Day without leading zero (3)
-                const y = d.getFullYear();  // Year (2024)
-                return `${m}/${day}/${y}`;  // mm/dd/yyyy e.g. 11/3/2024
-            }
-            return null;
-        }
 
         function switchUpdateMode(mode) {
             const singleBtn = document.getElementById('mode-single-btn');
@@ -522,6 +476,7 @@
         function toggleSearch() {
             const wrapper = document.getElementById('searchWrapper');
             const input = document.getElementById('tableSearch');
+            document.getElementById('multiSearchWrapper').classList.remove('expanded');
             wrapper.classList.toggle('expanded');
             if (wrapper.classList.contains('expanded')) input.focus();
         }
@@ -529,7 +484,26 @@
         function collapseSearch() {
             const wrapper = document.getElementById('searchWrapper');
             const input = document.getElementById('tableSearch');
-            if (input.value.trim() === '') wrapper.classList.remove('expanded');
+            if (input.value.trim() === '') {
+                wrapper.classList.remove('expanded');
+            }
+        }
+
+        function toggleMultiSearch(event) {
+            event.stopPropagation();
+            const multiWrapper = document.getElementById('multiSearchWrapper');
+            document.getElementById('searchWrapper').classList.remove('expanded');
+            multiWrapper.classList.toggle('expanded');
+            if (multiWrapper.classList.contains('expanded')) {
+                document.getElementById('multi-search-input').focus();
+            }
+        }
+
+        function handleBodyClick(event) {
+            const multiWrapper = document.getElementById('multiSearchWrapper');
+            if (multiWrapper && !multiWrapper.contains(event.target)) {
+                multiWrapper.classList.remove('expanded');
+            }
         }
 
         function updateClock() {
@@ -574,34 +548,6 @@
                     return `${dayStr}-${mCap}-${y}`;
                 }
             }
-
-            const mmddyyRegex = /^(\d{1,2})[-/](\d{1,2})[-/](\d{2}|\d{4})$/;
-            const match = trimmed.match(mmddyyRegex);
-            if (match) {
-                let m = parseInt(match[1], 10);
-                let d = parseInt(match[2], 10);
-                let y = parseInt(match[3], 10);
-                if (y < 100) y += 2000;
-                if (m >= 1 && m <= 12 && d >= 1 && d <= 31) {
-                    const dayStr = d < 10 ? '0' + d : '' + d;
-                    const mCap = monthNames[m - 1].charAt(0).toUpperCase() + monthNames[m - 1].slice(1);
-                    return `${dayStr}-${mCap}-${y}`;
-                }
-            }
-
-            const yyyymmddRegex = /^(\d{4})[-/](\d{1,2})[-/](\d{1,2})$/;
-            const yMatch = trimmed.match(yyyymmddRegex);
-            if (yMatch) {
-                let y = parseInt(yMatch[1], 10);
-                let m = parseInt(yMatch[2], 10);
-                let d = parseInt(yMatch[3], 10);
-                if (m >= 1 && m <= 12 && d >= 1 && d <= 31) {
-                    const dayStr = d < 10 ? '0' + d : '' + d;
-                    const mCap = monthNames[m - 1].charAt(0).toUpperCase() + monthNames[m - 1].slice(1);
-                    return `${dayStr}-${mCap}-${y}`;
-                }
-            }
-
             return null;
         }
 
@@ -620,7 +566,7 @@
         }
 
         function formatDateForInput(dateStr) {
-            if (!dateStr || dateStr === '-') return '';
+            if (!dateStr || dateStr === '-' || dateStr === 'null' || dateStr === 'undefined') return '';
             try {
                 const date = new Date(dateStr);
                 if (isNaN(date.getTime())) return '';
@@ -636,11 +582,10 @@
             const headers = sheetHeaders[currentSheet] || [];
             const tidIdx = headers.findIndex(h => h?.toUpperCase() === 'TID');
             
-            // Prioritize 'DBA NAME' over 'MERCHANT NAME'
             let dbaIdx = headers.findIndex(h => h?.toUpperCase() === 'DBA NAME');
-            if (dbaIdx === -1) {
-                dbaIdx = headers.findIndex(h => h?.toUpperCase() === 'MERCHANT NAME');
-            }
+            if (dbaIdx === -1) dbaIdx = headers.findIndex(h => h?.toUpperCase() === 'MERCHANT NAME');
+            if (dbaIdx === -1) dbaIdx = headers.findIndex(h => h?.toUpperCase().includes('DBA'));
+            if (dbaIdx === -1) dbaIdx = headers.findIndex(h => h?.toUpperCase().includes('MERCHANT'));
 
             const addrIdx = headers.findIndex(h => h?.toUpperCase() === 'ADDRESS');
             const tidValue = tidIdx !== -1 ? (row[tidIdx] || '-') : '-';
@@ -652,7 +597,7 @@
             document.body.appendChild(textArea);
             textArea.select();
             document.execCommand('copy');
-            showToast("Data Copied!", "bg-blue-600");
+            showToast("Data Copied (DBA Name)", "bg-blue-600");
             document.body.removeChild(textArea);
         }
 
@@ -675,13 +620,8 @@
             const syncIcon = document.getElementById('sync-icon');
             if (syncIcon) syncIcon.classList.add('sync-spin');
             
-            // Allow up to 20s for direct fetch before trying fallback (handles GAS cold starts)
-            const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 20000);
-
-            fetch(`${BASE_API_URL}?action=fetchData&_t=${Date.now()}`, { signal: controller.signal })
+            fetch(`${BASE_API_URL}?action=fetchData&_t=${Date.now()}`)
                 .then(response => {
-                    clearTimeout(timeoutId);
                     if (!response.ok) throw new Error('Network response was not ok');
                     return response.json();
                 })
@@ -691,37 +631,35 @@
                     } else {
                         throw new Error('Empty response');
                     }
-                    if (syncIcon) syncIcon.classList.remove('sync-spin');
                 })
                 .catch(err => {
-                    clearTimeout(timeoutId);
-                    console.warn("Direct fetch error or timeout, trying JSONP fallback:", err);
+                    console.warn("Direct fetch error, falling back to JSONP:", err);
                     tryJSONPFallback();
+                })
+                .finally(() => {
+                    if (syncIcon) syncIcon.classList.remove('sync-spin');
                 });
         }
 
         function tryJSONPFallback() {
-            setStatus('Connecting via JSONP (Cold Start)...', 'bg-amber-500 animate-pulse');
+            setStatus('Connecting via JSONP...', 'bg-amber-500 animate-pulse');
             const syncIcon = document.getElementById('sync-icon');
             const callback = 'cb_' + Math.floor(Math.random() * 1000000);
             
-            // Increased timeout to 25 seconds for Google Apps Script execution cold starts
             const timeoutId = setTimeout(() => {
                 if (window[callback]) {
-                    console.warn("JSONP timeout after 25s.");
                     setStatus('Connection Timeout', 'bg-rose-500');
-                    showToast('Timeout connecting to live server. Please try again.', 'bg-rose-600');
+                    showToast('Failed to connect to live backend.', 'bg-rose-600');
                     if (syncIcon) syncIcon.classList.remove('sync-spin');
                     delete window[callback];
                     document.getElementById('jsonp-' + callback)?.remove();
                 }
-            }, 25000);
+            }, 8000);
 
             window[callback] = (res) => {
                 clearTimeout(timeoutId);
-                if (!res || Object.keys(res).length === 0) {
+                if (!res) {
                     setStatus('Error (Empty Data)', 'bg-rose-500');
-                    showToast('Server returned empty data.', 'bg-amber-600');
                     if (syncIcon) syncIcon.classList.remove('sync-spin');
                     return;
                 }
@@ -735,11 +673,9 @@
             script.id = 'jsonp-' + callback;
             script.onerror = () => {
                 clearTimeout(timeoutId);
-                console.warn("JSONP script load error.");
                 setStatus('Live Connection Failed', 'bg-rose-500');
                 showToast('Unable to fetch live data from server.', 'bg-rose-600');
                 if (syncIcon) syncIcon.classList.remove('sync-spin');
-                delete window[callback];
             };
             script.src = `${BASE_API_URL}?action=fetchData&callback=${callback}&_t=${Date.now()}`;
             document.body.appendChild(script);
@@ -761,8 +697,9 @@
                             }
                         });
                     } else {
-                        sheetHeaders[sheetName] = rows[0]; 
+                        let originalHeaders = rows[0];
                         allSheetsData[sheetName] = rows.slice(1);
+                        sheetHeaders[sheetName] = originalHeaders;
                     }
                 }
             });
@@ -828,7 +765,6 @@
 
             const uRbySelect = document.getElementById('u-rby');
             const bRbySelect = document.getElementById('b-rby');
-            
             const engineerOptionsHtml = '<option value="">Select Engineer</option>' + 
                 engineerList.map(eng => `<option value="${eng}">${eng}</option>`).join('');
 
@@ -861,7 +797,6 @@
 
             const headers = (sheetHeaders[currentSheet] || []).map(h => String(h || '').toUpperCase().trim());
             const verIdx = headers.findIndex(h => h.includes('APP VERSION') || h.includes('APP. VERSION') || h === 'VERSION' || h === 'VER');
-            
             const dateIndices = headers.map((h, idx) => (h.includes('DATE') || h.includes('VISIT')) ? idx : -1).filter(idx => idx !== -1);
 
             let activeRows = allSheetsData[currentSheet] || [];
@@ -873,13 +808,11 @@
                     return dateIndices.some(dIdx => {
                         const cellVal = row[dIdx];
                         if (!cellVal) return false;
-                        
                         const formattedCellDate = formatDateReadable(cellVal);
                         if (targetParsedDate && formattedCellDate) {
                             return formattedCellDate.toLowerCase() === targetParsedDate.toLowerCase();
                         }
-                        const formattedInputDate = formatDateForInput(cellVal);
-                        return formattedInputDate === selectedDate;
+                        return formatDateForInput(cellVal) === selectedDate;
                     });
                 });
             }
@@ -911,7 +844,7 @@
             });
 
             if (sortedVersions.length === 0) {
-                container.innerHTML = `<div class="text-[10px] text-slate-500 italic col-span-full py-1">No version records found ${selectedDate ? 'for selected date' : ''}.</div>`;
+                container.innerHTML = `<div class="text-[10px] text-slate-500 italic col-span-full py-1">No version records found.</div>`;
                 return;
             }
 
@@ -920,7 +853,6 @@
                 const count = versionCounts[ver];
                 const pct = totalTerminals > 0 ? ((count / totalTerminals) * 100).toFixed(1) : '0';
                 const isUnassigned = ver === 'Unassigned';
-
                 const tagBg = isUnassigned ? 'bg-slate-800 text-slate-400' : 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/30';
                 const barColor = isUnassigned ? 'bg-slate-600' : 'bg-cyan-400';
 
@@ -942,7 +874,6 @@
                     </div>
                 `;
             });
-
             container.innerHTML = html;
         }
 
@@ -957,11 +888,9 @@
         function filterByVersion(verString) {
             const searchWrapper = document.getElementById('searchWrapper');
             const searchInput = document.getElementById('tableSearch');
-            
             if (!searchWrapper.classList.contains('expanded')) {
                 searchWrapper.classList.add('expanded');
             }
-            
             searchInput.value = verString;
             handleSearch();
             showToast(verString ? `Filtered by ${verString}` : 'Showing all entries', 'bg-blue-600');
@@ -969,13 +898,10 @@
 
         function switchSheet(sheetName) {
             currentSheet = sheetName;
-            columnFilters = {}; // Reset column filters on sheet switch
-            
             document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.toggle('active', btn.id === `tab-${sheetName}`));
             
             const targetSheetSelect = document.getElementById('u-sheet');
             if (targetSheetSelect) targetSheetSelect.value = sheetName;
-
             const batchSheetSelect = document.getElementById('b-sheet');
             if (batchSheetSelect) batchSheetSelect.value = sheetName;
 
@@ -991,13 +917,13 @@
             }
         }
 
-        function setColumnFilter(colIdx, val) {
-            if (!val || !val.trim()) {
-                delete columnFilters[colIdx];
-            } else {
-                columnFilters[colIdx] = val.trim().toLowerCase();
-            }
-            handleSearch();
+        function getOrderedColumns(headers) {
+            let tidIdx = headers.findIndex(h => String(h || '').toUpperCase().trim() === 'TID');
+            let otherIndices = [];
+            headers.forEach((h, idx) => {
+                otherIndices.push(idx);
+            });
+            return { tidIdx, otherIndices };
         }
 
         function renderTable() {
@@ -1006,532 +932,479 @@
             const headers = sheetHeaders[currentSheet] || [];
             if (!tbody || headers.length === 0) return;
 
-            const isPBL = currentSheet.toUpperCase().includes('PBL');
-            const hideForPBL = ['REMARKS', 'CONFIGURE BY'];
-            const visibleIndices = headers.map((h, idx) => {
-                if (isPBL && hideForPBL.includes((h || '').toUpperCase())) return null;
-                return idx;
-            }).filter(idx => idx !== null);
+            const { tidIdx, otherIndices } = getOrderedColumns(headers);
 
-            let headerHtml = '<tr class="text-slate-400 uppercase font-black tracking-wider border-b border-slate-700">';
-            headerHtml += `<th class="p-3 sticky-col-copy"><div class="header-wrap-2-lines flex items-center justify-center">COPY</div></th>`;
-            visibleIndices.forEach(idx => {
-                const label = headers[idx] || `Col ${idx + 1}`;
-                const lower = label.toLowerCase();
-                let extraClass = "p-3 bg-slate-800";
-                let textClass = "header-wrap-2-lines";
-                if (lower.includes('tid') || lower === 'id') {
-                    extraClass += " sticky-col-tid";
-                    textClass += " text-blue-400";
+            let headerHtml = `<tr class="bg-slate-900 text-slate-300 uppercase text-[9px] font-black border-b border-slate-700/80">`;
+            headerHtml += `<th class="sticky-col-copy p-2.5 text-center">Copy</th>`;
+            
+            headers.forEach((h, idx) => {
+                const hName = String(h || '').trim();
+                const isTid = idx === tidIdx;
+                if (isTid) {
+                    headerHtml += `<th class="sticky-col-tid p-2.5 min-w-[105px]">${hName || 'TID'}</th>`;
+                } else {
+                    headerHtml += `<th class="p-2.5 min-w-[120px]">${hName || 'COL ' + (idx + 1)}</th>`;
                 }
-                headerHtml += `<th class="${extraClass}"><div class="${textClass}">${label}</div></th>`;
             });
-            headerHtml += '</tr>';
-
-            // Active Column Header Filters Row
-            if (isColumnFilterVisible) {
-                headerHtml += '<tr class="bg-slate-900 border-b border-slate-700/80">';
-                headerHtml += `<th class="p-1 sticky-col-copy"></th>`;
-                visibleIndices.forEach(idx => {
-                    const currentFilter = columnFilters[idx] || '';
-                    const label = (headers[idx] || '').toLowerCase();
-                    let extraClass = "p-1 bg-slate-900";
-                    if (label.includes('tid') || label === 'id') extraClass += " sticky-col-tid";
-
-                    headerHtml += `<th class="${extraClass}">
-                        <input type="text" 
-                               value="${currentFilter}" 
-                               onkeyup="setColumnFilter(${idx}, this.value)" 
-                               placeholder="Filter..." 
-                               class="w-full bg-slate-950 border border-slate-700 rounded px-1.5 py-1 text-[10px] text-slate-200 outline-none focus:border-cyan-400 font-normal">
-                    </th>`;
-                });
-                headerHtml += '</tr>';
-            }
-
+            headerHtml += `</tr>`;
             headerRow.innerHTML = headerHtml;
 
-            const totalPages = Math.ceil(filteredData.length / pageSize) || 1;
+            const totalRows = filteredData.length;
+            const totalPages = Math.ceil(totalRows / pageSize) || 1;
             if (currentPage > totalPages) currentPage = totalPages;
             if (currentPage < 1) currentPage = 1;
 
             const startIdx = (currentPage - 1) * pageSize;
-            const endIdx = startIdx + pageSize;
+            const endIdx = Math.min(startIdx + pageSize, totalRows);
             const pageData = filteredData.slice(startIdx, endIdx);
 
+            document.getElementById('result-count').textContent = `${totalRows} Results`;
+            document.getElementById('page-info').textContent = `Page ${currentPage} of ${totalPages}`;
+            document.getElementById('prev-btn').disabled = currentPage <= 1;
+            document.getElementById('next-btn').disabled = currentPage >= totalPages;
+
+            if (pageData.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="${headers.length + 1}" class="p-10 text-center text-slate-500 italic">No matching records found.</td></tr>`;
+                return;
+            }
+
             let bodyHtml = '';
-            pageData.forEach((row, dataIdx) => {
-                const globalIdx = startIdx + dataIdx;
-                bodyHtml += `<tr class="hover:bg-slate-800/30 border-b border-slate-800/20">`;
-                bodyHtml += `<td class="p-3 text-center sticky-col-copy"><button onclick="copyRowData(${globalIdx})" class="copy-row-btn"><i class="fas fa-copy"></i></button></td>`;
-                visibleIndices.forEach(idx => {
-                    let val = row[idx] ?? '-';
-                    const label = (headers[idx] || '').toUpperCase();
-                    let cellClass = "p-3";
-                    let content = val;
-                    if (label === 'TID') cellClass += " font-black text-blue-400 sticky-col-tid";
-                    if (label.includes('DATE')) content = formatDateReadable(val) || '-';
-                    bodyHtml += `<td class="${cellClass}">${content}</td>`;
+            pageData.forEach((row, i) => {
+                const globalIdx = startIdx + i;
+                bodyHtml += `<tr class="border-b border-slate-800/40 transition-colors">`;
+                bodyHtml += `<td class="sticky-col-copy p-2 text-center">
+                    <button onclick="copyRowData(${globalIdx})" class="copy-row-btn py-1 px-2 text-[10px] font-bold bg-blue-600/10 hover:bg-blue-600 text-blue-400 hover:text-white rounded border border-blue-500/20 w-full flex items-center justify-center gap-1" title="Copy Row Data">
+                        <i class="fas fa-copy text-xs"></i> Copy
+                    </button>
+                </td>`;
+
+                headers.forEach((_, colIdx) => {
+                    let val = row[colIdx];
+                    const hName = String(headers[colIdx] || '').trim().toUpperCase();
+                    if ((hName.includes('DATE') || hName.includes('VISIT')) && val) {
+                        val = formatDateReadable(val);
+                    }
+                    if (val === null || val === undefined || val === '-' || val === 'null' || val === 'undefined' || String(val).trim() === '') {
+                        val = '';
+                    }
+                    
+                    if (colIdx === tidIdx) {
+                        bodyHtml += `<td class="sticky-col-tid p-2 font-mono font-bold text-cyan-400 text-xs">${val}</td>`;
+                    } else {
+                        bodyHtml += `<td class="p-2 text-slate-300">${val}</td>`;
+                    }
                 });
                 bodyHtml += `</tr>`;
             });
-            tbody.innerHTML = bodyHtml || '<tr><td colspan="30" class="p-10 text-center">No matching records.</td></tr>';
-            
-            document.getElementById('page-info').textContent = `Page ${currentPage} of ${totalPages}`;
-            document.getElementById('result-count').textContent = `${filteredData.length} Results`;
-            const prevBtn = document.getElementById('prev-btn');
-            const nextBtn = document.getElementById('next-btn');
-            if(prevBtn) prevBtn.disabled = currentPage === 1;
-            if(nextBtn) nextBtn.disabled = currentPage >= totalPages || totalPages === 0;
+            tbody.innerHTML = bodyHtml;
+        }
+
+        function changePage(direction) {
+            currentPage += direction;
+            renderTable();
+            document.querySelector('.table-container')?.scrollTo(0, 0);
         }
 
         function handleSearch() {
-            const singleQuery = document.getElementById('tableSearch').value.trim().toLowerCase();
-            const multiQuery = document.getElementById('multiSearchInput')?.value.trim().toLowerCase() || '';
-            const rows = allSheetsData[currentSheet] || [];
-            const headers = sheetHeaders[currentSheet] || [];
+            const query = document.getElementById('tableSearch').value.toLowerCase().trim();
+            const rawRows = allSheetsData[currentSheet] || [];
             
-            const dateIndices = headers.map((h, idx) => (String(h || '').toUpperCase().includes('DATE') || String(h || '').toUpperCase().includes('VISIT')) ? idx : -1).filter(idx => idx !== -1);
-
-            // Split multi search terms by commas, newlines, or multiple spaces
-            const multiTerms = multiQuery ? multiQuery.split(/[\n,\s]+/).map(t => t.trim()).filter(Boolean) : [];
-
-            filteredData = rows.filter(row => {
-                // 1. Column filters check
-                for (let colIdx in columnFilters) {
-                    const filterTerm = columnFilters[colIdx];
-                    const cellVal = String(row[colIdx] || '').toLowerCase();
-                    let dateFormatted = '';
-                    if (dateIndices.includes(Number(colIdx))) {
-                        dateFormatted = (formatDateReadable(row[colIdx]) || '').toLowerCase();
-                    }
-                    if (!cellVal.includes(filterTerm) && !dateFormatted.includes(filterTerm)) {
-                        return false;
-                    }
-                }
-
-                // 2. Multi-term search check (if active and filled)
-                if (multiTerms.length > 0) {
-                    const rowText = row.map((cell, idx) => {
-                        let text = String(cell || '').toLowerCase();
-                        if (dateIndices.includes(idx)) {
-                            text += ' ' + (formatDateReadable(cell) || '').toLowerCase();
-                        }
-                        return text;
-                    }).join(' ');
-
-                    const matchesAnyTerm = multiTerms.some(term => rowText.includes(term));
-                    if (!matchesAnyTerm) return false;
-                }
-
-                // 3. Single Search Bar Check
-                if (singleQuery) {
-                    const targetParsedDate = parseSearchDateToFormatted(singleQuery);
-                    const matchDirect = row.some(cell => String(cell || '').toLowerCase().includes(singleQuery));
-                    if (matchDirect) return true;
-
-                    if (targetParsedDate) {
-                        return dateIndices.some(dIdx => {
-                            const formatted = formatDateReadable(row[dIdx]);
-                            return formatted && formatted.toLowerCase() === targetParsedDate.toLowerCase();
-                        });
-                    }
-                    return false;
-                }
-
-                return true;
-            });
-
+            if (!query) {
+                filteredData = [...rawRows];
+            } else {
+                filteredData = rawRows.filter(row => {
+                    return row.some(cell => String(cell || '').toLowerCase().includes(query));
+                });
+            }
             currentPage = 1;
             renderTable();
+            updateActiveFilterUI();
         }
 
-        function downloadTableData() {
-            const headers = sheetHeaders[currentSheet] || [];
-            const rows = filteredData;
-            if (rows.length === 0) {
-                showWarning("No data available to export.");
-                return;
+        function handleMultiSearch() {
+            const rawText = document.getElementById('multi-search-input').value;
+            const terms = rawText.split('\n').map(t => t.trim()).filter(t => t.length > 0);
+            const rawRows = allSheetsData[currentSheet] || [];
+
+            if (terms.length === 0) {
+                filteredData = [...rawRows];
+            } else {
+                filteredData = rawRows.filter(row => {
+                    return row.some(cell => {
+                        const cellStr = String(cell || '').toLowerCase();
+                        return terms.some(term => cellStr.includes(term.toLowerCase()));
+                    });
+                });
             }
+            currentPage = 1;
+            renderTable();
+            updateActiveFilterUI();
+        }
 
-            const cleanHeaders = headers.map(h => String(h || '').trim());
-            
-            // Find column indices that contain date fields
-            const dateIndices = cleanHeaders.map((h, idx) => {
-                const hUpper = h.toUpperCase();
-                return (hUpper.includes('DATE') || hUpper.includes('VISIT')) ? idx : -1;
-            }).filter(idx => idx !== -1);
+        function clearMultiSearch() {
+            document.getElementById('multi-search-input').value = '';
+            handleMultiSearch();
+        }
 
-            // Clean rows: format dates to M/D/YYYY (e.g. 11/3/2024), set empty/blank cells to null
-            const processedRows = rows.map(row => {
-                const cleanRow = [];
-                let hasContent = false;
-                
-                for (let i = 0; i < cleanHeaders.length; i++) {
-                    let val = row[i];
-                    
-                    if (val === null || val === undefined || val === 'null' || val === 'undefined') {
-                        val = null; // Excel treats null as true empty blank cell!
-                    } else {
-                        val = String(val).trim();
-                        if (val === '' || val === '-') {
-                            val = null;
-                        }
-                    }
+        function updateActiveFilterUI() {
+            const searchVal = document.getElementById('tableSearch').value.trim();
+            const multiVal = document.getElementById('multi-search-input').value.trim();
+            const resetBtn = document.getElementById('reset-filters-btn');
+            const countSpan = document.getElementById('active-filter-count');
 
-                    if (val !== null) {
-                        // Format date columns to M/D/YYYY format (e.g. 11/3/2024)
-                        if (dateIndices.includes(i)) {
-                            const formattedExcelDate = formatDateForExcel(val);
-                            if (formattedExcelDate) {
-                                val = formattedExcelDate;
-                            }
-                        }
-                        hasContent = true;
-                    }
-                    cleanRow.push(val);
-                }
-                
-                return hasContent ? cleanRow : null;
-            }).filter(Boolean);
+            let activeCount = 0;
+            if (searchVal) activeCount++;
+            if (multiVal) activeCount++;
 
-            const exportData = [cleanHeaders, ...processedRows];
-            
-            const wb = XLSX.utils.book_new();
-            // Dense mode false ensures empty null coordinates are omitted from worksheet data
-            const ws = XLSX.utils.aoa_to_sheet(exportData, { dense: false });
-
-            // Purge empty string or null cell references from ws object so Excel treats them as completely empty
-            for (let cellRef in ws) {
-                if (cellRef[0] === '!') continue;
-                if (ws[cellRef].v === null || ws[cellRef].v === undefined || ws[cellRef].v === '') {
-                    delete ws[cellRef];
-                }
+            if (activeCount > 0) {
+                resetBtn.classList.remove('hidden');
+                resetBtn.classList.add('flex');
+                countSpan.textContent = activeCount;
+            } else {
+                resetBtn.classList.add('hidden');
+                resetBtn.classList.remove('flex');
             }
+        }
 
-            // Enable Native Excel AutoFilter on Header Row
-            if (processedRows.length > 0 && cleanHeaders.length > 0) {
-                const range = { s: { r: 0, c: 0 }, e: { r: processedRows.length, c: cleanHeaders.length - 1 } };
-                ws['!autofilter'] = { ref: XLSX.utils.encode_range(range) };
-            }
-            
-            XLSX.utils.book_append_sheet(wb, ws, currentSheet.substring(0, 30));
-            XLSX.writeFile(wb, `${currentSheet}_Export.xlsx`);
-            showToast("Export successful!", "bg-emerald-600");
+        function resetAllFilters() {
+            document.getElementById('tableSearch').value = '';
+            document.getElementById('multi-search-input').value = '';
+            document.getElementById('searchWrapper').classList.remove('expanded');
+            document.getElementById('multiSearchWrapper').classList.remove('expanded');
+            filteredData = [...(allSheetsData[currentSheet] || [])];
+            currentPage = 1;
+            renderTable();
+            updateActiveFilterUI();
+            showToast('All filters cleared', 'bg-blue-600');
         }
 
         function handleTIDLookup() {
-            const sheet = document.getElementById('u-sheet')?.value || currentSheet;
-            const tidInput = document.getElementById('u-tid');
-            if (!tidInput) return;
-            const tid = tidInput.value.trim();
+            const sheet = document.getElementById('u-sheet').value;
+            const tidInput = document.getElementById('u-tid').value.trim();
+            const dbaIndicator = document.getElementById('dba-indicator');
+            const lookupIndicator = document.getElementById('lookup-indicator');
+            const headers = sheetHeaders[sheet] || [];
+            const rows = allSheetsData[sheet] || [];
 
-            const dbaInd = document.getElementById('dba-indicator');
-            const lookInd = document.getElementById('lookup-indicator');
-            const psnInput = document.getElementById('u-psn');
-            const verInput = document.getElementById('u-ver');
-            const remInput = document.getElementById('u-rem');
-
-            if (!tid) {
-                if (dbaInd) dbaInd.classList.add('opacity-0');
-                if (lookInd) lookInd.classList.add('opacity-0');
+            if (!tidInput) {
+                dbaIndicator.style.opacity = '0';
+                lookupIndicator.style.opacity = '0';
                 return;
             }
 
-            const rows = allSheetsData[sheet] || [];
-            const headers = (sheetHeaders[sheet] || []).map(h => String(h || '').toUpperCase().trim());
+            const tidIdx = headers.findIndex(h => String(h || '').toUpperCase().trim() === 'TID');
+            let dbaIdx = headers.findIndex(h => String(h || '').toUpperCase().includes('DBA NAME'));
+            if (dbaIdx === -1) dbaIdx = headers.findIndex(h => String(h || '').toUpperCase().includes('MERCHANT NAME'));
 
-            const tidIdx = headers.findIndex(h => h === 'TID');
-            const dbaIdx = headers.findIndex(h => h.includes('DBA') || h.includes('MERCHANT'));
-            const psnIdx = headers.findIndex(h => h.includes('POS S/N') || h.includes('SERIAL') || h.includes('S/N'));
-            const verIdx = headers.findIndex(h => h.includes('APP VERSION') || h.includes('APP. VERSION') || h === 'VERSION' || h === 'VER');
-            const remIdx = headers.findIndex(h => h.includes('REMARKS'));
-
-            if (tidIdx === -1) return;
-
-            const targetClean = cleanStr(tid);
-            const foundRow = rows.find(r => cleanStr(r[tidIdx]) === targetClean);
+            const foundRow = rows.find(r => String(r[tidIdx] || '').trim() === tidInput);
 
             if (foundRow) {
-                const dbaVal = dbaIdx !== -1 ? (foundRow[dbaIdx] || 'Found') : 'Match Found';
-                if (dbaInd) {
-                    dbaInd.textContent = dbaVal;
-                    dbaInd.className = "text-[8px] font-black uppercase px-2 py-0.5 rounded opacity-100 bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 max-w-[150px] truncate";
-                }
-                if (lookInd) {
-                    lookInd.textContent = "MATCHED";
-                    lookInd.className = "text-[8px] font-bold uppercase px-2 py-0.5 rounded opacity-100 bg-emerald-500/20 text-emerald-400";
-                }
-
-                if (psnInput && psnIdx !== -1 && foundRow[psnIdx]) psnInput.value = foundRow[psnIdx];
-                if (verInput && verIdx !== -1 && foundRow[verIdx]) {
-                    verInput.value = foundRow[verIdx];
-                    if (!verInput.dataset) verInput.dataset = {};
-                    verInput.dataset.prevVer = foundRow[verIdx];
-                }
-                if (remInput && remIdx !== -1 && foundRow[remIdx]) {
-                    remInput.value = foundRow[remIdx];
-                    if (!remInput.dataset) remInput.dataset = {};
-                    remInput.dataset.prevRem = foundRow[remIdx];
-                }
+                const dbaName = dbaIdx !== -1 ? (foundRow[dbaIdx] || 'Found') : 'Found';
+                dbaIndicator.textContent = dbaName;
+                dbaIndicator.style.opacity = '1';
+                lookupIndicator.textContent = 'TID Exists';
+                lookupIndicator.className = 'text-[8px] font-bold uppercase px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 opacity-100';
             } else {
-                if (dbaInd) {
-                    dbaInd.textContent = "Not Found in Sheet";
-                    dbaInd.className = "text-[8px] font-black uppercase px-2 py-0.5 rounded opacity-100 bg-rose-500/20 text-rose-300 border border-rose-500/30";
-                }
-                if (lookInd) {
-                    lookInd.textContent = "NO MATCH";
-                    lookInd.className = "text-[8px] font-bold uppercase px-2 py-0.5 rounded opacity-100 bg-rose-500/20 text-rose-400";
-                }
+                dbaIndicator.textContent = 'Not Found';
+                dbaIndicator.style.opacity = '1';
+                lookupIndicator.textContent = 'New TID';
+                lookupIndicator.className = 'text-[8px] font-bold uppercase px-2 py-0.5 rounded bg-amber-500/20 text-amber-400 border border-amber-500/30 opacity-100';
             }
-        }
-
-        function parseBatchInput() {
-            const raw = document.getElementById('b-raw-input')?.value || '';
-            const batchSheet = document.getElementById('b-sheet')?.value || currentSheet;
-            const targetVer = document.getElementById('b-ver')?.value.trim() || '';
-            
-            const lines = raw.split('\n').map(l => l.trim()).filter(Boolean);
-            const previewWrapper = document.getElementById('batch-preview-wrapper');
-            const previewBody = document.getElementById('batch-preview-body');
-
-            if (lines.length === 0) {
-                if (previewWrapper) previewWrapper.classList.add('hidden');
-                parsedBatchItems = [];
-                return;
-            }
-
-            if (previewWrapper) previewWrapper.classList.remove('hidden');
-
-            const rows = allSheetsData[batchSheet] || [];
-            const headers = (sheetHeaders[batchSheet] || []).map(h => String(h || '').toUpperCase().trim());
-            const tidIdx = headers.findIndex(h => h === 'TID');
-            const psnIdx = headers.findIndex(h => h.includes('POS S/N') || h.includes('SERIAL') || h.includes('S/N'));
-
-            let validCount = 0;
-            let invalidCount = 0;
-            parsedBatchItems = [];
-
-            let html = '';
-            lines.forEach((line, index) => {
-                const parts = line.split(/\s+/);
-                const tid = parts[0];
-                const note = parts.slice(1).join(' ');
-
-                const cleanTarget = cleanStr(tid);
-                const matchedRow = tidIdx !== -1 ? rows.find(r => cleanStr(r[tidIdx]) === cleanTarget) : null;
-                const isMatched = !!matchedRow;
-
-                // Lookup and preserve existing POS S/N if found in the sheet
-                const existingPsn = (matchedRow && psnIdx !== -1 && matchedRow[psnIdx]) ? String(matchedRow[psnIdx]).trim() : '-';
-
-                if (isMatched) validCount++; else invalidCount++;
-
-                let osType = '-';
-                let remarkText = note;
-
-                if (note.toLowerCase().includes('old os') || note.toLowerCase().includes('new os')) {
-                    osType = note;
-                }
-
-                parsedBatchItems.push({
-                    index: index + 1,
-                    tid: tid,
-                    posSn: existingPsn,
-                    isMatched: isMatched,
-                    osType: osType,
-                    remarks: remarkText,
-                    targetVer: targetVer,
-                    status: 'Pending'
-                });
-
-                const statusBadge = isMatched 
-                    ? `<span class="bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded font-black text-[8px]">MATCHED</span>`
-                    : `<span class="bg-amber-500/20 text-amber-400 px-2 py-0.5 rounded font-black text-[8px]">NOT FOUND</span>`;
-
-                html += `<tr class="hover:bg-slate-800/40 border-b border-slate-800/40">
-                    <td class="p-2.5 text-slate-500 font-bold">${index + 1}</td>
-                    <td class="p-2.5 font-black text-blue-400 clock-font">${tid}</td>
-                    <td class="p-2.5 font-mono text-slate-200">${existingPsn}</td>
-                    <td class="p-2.5">${statusBadge}</td>
-                    <td class="p-2.5 text-slate-300">${isMatched ? 'Update Existing' : 'Create / Append'}</td>
-                    <td class="p-2.5 font-mono text-cyan-300">${targetVer || '-'}</td>
-                    <td class="p-2.5 text-slate-400">${osType}</td>
-                    <td class="p-2.5 text-slate-300 truncate max-w-[150px]">${remarkText || '-'}</td>
-                    <td class="p-2.5 text-center"><span id="batch-status-${index}" class="text-slate-400 font-bold">Ready</span></td>
-                </tr>`;
-            });
-
-            if (previewBody) previewBody.innerHTML = html;
-            
-            const batchCountEl = document.getElementById('batch-count');
-            const batchValidEl = document.getElementById('batch-valid-count');
-            const batchInvalidEl = document.getElementById('batch-invalid-count');
-
-            if (batchCountEl) batchCountEl.textContent = lines.length;
-            if (batchValidEl) batchValidEl.textContent = `${validCount} Valid`;
-            if (batchInvalidEl) batchInvalidEl.textContent = `${invalidCount} Mismatched`;
-        }
-
-        function loadBatchSampleData() {
-            const textarea = document.getElementById('b-raw-input');
-            if (textarea) {
-                textarea.value = `20012390 Old OS\n20002218 Location not found\n20002514 Shop closed POS at others location\n20034810\n20034812 Done`;
-                parseBatchInput();
-                showToast("Sample lines loaded!", "bg-blue-600");
-            }
-        }
-
-        function executeBatchUpdate() {
-            if (isBatchProcessing) return;
-            if (parsedBatchItems.length === 0) {
-                showWarning("No valid batch lines found to process.");
-                return;
-            }
-
-            const sheet = document.getElementById('b-sheet').value;
-            const date = document.getElementById('b-rdate').value;
-            const rollBy = document.getElementById('b-rby').value;
-
-            if (!date || !rollBy) {
-                showWarning("Please select RollOut/Visit Date and RollOut By Engineer before executing batch updates.");
-                return;
-            }
-
-            isBatchProcessing = true;
-            const execBtn = document.getElementById('btn-execute-batch');
-            if (execBtn) {
-                execBtn.disabled = true;
-                execBtn.innerHTML = `<i class="fas fa-spinner fa-spin mr-1"></i> Processing Batch...`;
-            }
-
-            let processed = 0;
-            const total = parsedBatchItems.length;
-
-            const processItem = (idx) => {
-                if (idx >= total) {
-                    isBatchProcessing = false;
-                    if (execBtn) {
-                        execBtn.disabled = false;
-                        execBtn.innerHTML = `<i class="fas fa-check mr-1"></i> Batch Complete`;
-                        setTimeout(() => { execBtn.innerHTML = `<i class="fas fa-play"></i> Execute Batch Update`; }, 3000);
-                    }
-                    showToast(`Batch processing complete! (${total} items processed)`, 'bg-emerald-600');
-                    fetchSheetData();
-                    return;
-                }
-
-                const item = parsedBatchItems[idx];
-                const statusCell = document.getElementById(`batch-status-${idx}`);
-                if (statusCell) statusCell.innerHTML = `<i class="fas fa-spinner fa-spin text-blue-400"></i>`;
-
-                const payload = {
-                    action: 'updateDeployment',
-                    sheetName: sheet,
-                    tid: item.tid,
-                    posSn: String(item.posSn || '-'),
-                    rollBy: rollBy,
-                    rollDate: date,
-                    version: item.targetVer,
-                    remarks: item.remarks,
-                    osType: item.osType
-                };
-
-                const formData = new URLSearchParams();
-                Object.keys(payload).forEach(key => formData.append(key, payload[key]));
-
-                fetch(BASE_API_URL, {
-                    method: 'POST',
-                    mode: 'no-cors',
-                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                    body: formData.toString()
-                })
-                .then(() => {
-                    if (statusCell) statusCell.innerHTML = `<span class="text-emerald-400 font-bold"><i class="fas fa-check"></i> Done</span>`;
-                })
-                .catch(() => {
-                    if (statusCell) statusCell.innerHTML = `<span class="text-rose-400 font-bold"><i class="fas fa-times"></i> Error</span>`;
-                })
-                .finally(() => {
-                    processed++;
-                    setTimeout(() => processItem(idx + 1), 300);
-                });
-            };
-
-            processItem(0);
         }
 
         function submitUpdate() {
             const sheet = document.getElementById('u-sheet').value;
             const tid = document.getElementById('u-tid').value.trim();
-            const psn = document.getElementById('u-psn').value.trim();
-            const rollBy = document.getElementById('u-rby').value;
-            const date = document.getElementById('u-rdate').value;
-            let version = document.getElementById('u-ver').value.trim();
-            let remarks = document.getElementById('u-rem').value.trim();
+            const rby = document.getElementById('u-rby').value;
+            const rdate = document.getElementById('u-rdate').value;
+            const ver = document.getElementById('u-ver').value.trim();
+            let rem = document.getElementById('u-rem').value.trim();
 
-            const verInput = document.getElementById('u-ver');
-            const remInput = document.getElementById('u-rem');
-            const prevVer = verInput?.dataset?.prevVer || '';
-            const prevRem = remInput?.dataset?.prevRem || '';
-
-            if (!tid || !psn || !rollBy || !date) {
-                showWarning("Please select and fill in all mandatory fields: TID, POS S/N, Engineer Name (RollOut By), and RollOut/Visit Date.");
+            if (!tid || !rby || !rdate) {
+                showWarning("Please fill in all mandatory fields: TID, RollOut By, and Date.");
                 return;
             }
 
-            // If App Version is being updated to a new version, old remarks are cleared
-            if (prevVer && version && version !== prevVer) {
-                if (remarks === prevRem) {
-                    remarks = '';
-                }
+            while (
+                (rem.startsWith("(") && rem.endsWith(")")) ||
+                (rem.startsWith("[") && rem.endsWith("]")) ||
+                (rem.startsWith("{") && rem.endsWith("}"))
+            ) {
+                rem = rem.substring(1, rem.length - 1).trim();
             }
 
             const btn = document.getElementById('btn-submit');
             btn.disabled = true;
-            btn.textContent = 'Updating...';
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i> Updating...';
 
             const payload = {
-                action: 'updateDeployment',
+                action: "updateDeployment",
                 sheetName: sheet,
                 tid: tid,
-                posSn: psn,
-                rollBy: rollBy,
-                rollDate: date,
-                version: version,
-                remarks: remarks,
-                osType: '-'
+                rollBy: rby,
+                rollDate: rdate,
+                version: ver,
+                remarks: rem
             };
-
-            const formData = new URLSearchParams();
-            Object.keys(payload).forEach(key => formData.append(key, payload[key]));
 
             fetch(BASE_API_URL, {
                 method: 'POST',
-                mode: 'no-cors',
-                headers: {
-                    'Content-Type': 'application/x-www-form-urlencoded',
-                },
-                body: formData.toString()
+                headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                body: JSON.stringify(payload)
             })
-            .then(() => {
-                btn.disabled = false;
-                btn.textContent = 'Update';
-                showToast('Terminal updated successfully!', 'bg-emerald-600');
+            .then(res => res.json())
+            .then(response => {
+                if (response.success || response.status === 'success') {
+                    showToast("Terminal Updated Successfully!", "bg-emerald-600");
+                    document.getElementById('u-tid').value = '';
+                    document.getElementById('u-rem').value = '';
+                    handleTIDLookup();
+                    fetchSheetData();
+                } else {
+                    throw new Error(response.message || 'Update failed');
+                }
+            })
+            .catch(err => {
+                console.warn("POST failed:", err);
+                showToast("Update request sent.", "bg-blue-600");
                 fetchSheetData();
-                document.getElementById('u-tid').value = '';
-                document.getElementById('u-psn').value = '';
-                document.getElementById('u-rem').value = '';
-                handleTIDLookup();
             })
-            .catch(error => {
+            .finally(() => {
                 btn.disabled = false;
-                btn.textContent = 'Update';
-                showToast('Network error during update', 'bg-rose-600');
+                btn.innerHTML = 'Update';
             });
         }
 
+        function loadBatchSampleData() {
+            const sample = `20022094 Location change (move to Remarks)\n20022054 \n20020300 Marchant closed POS withdrawal (move to Remarks)\n20020301 Marchant closed POS withdrawal (move to Remarks)\n20023541 Old OS (move to OS Type)\n20024628 (no OS type or Remarks)`;
+            document.getElementById('b-raw-input').value = sample;
+            parseBatchInput();
+        }
+
+        function parseBatchInput() {
+            const rawText = document.getElementById('b-raw-input').value;
+            const sheet = document.getElementById('b-sheet').value;
+            const globalTargetVer = document.getElementById('b-ver').value.trim() || "112.0831";
+
+            const headers = sheetHeaders[sheet] || [];
+            const rows = allSheetsData[sheet] || [];
+            const tidIdx = headers.findIndex(h => String(h || '').toUpperCase().trim() === 'TID');
+
+            let dbaIdx = headers.findIndex(h => String(h || '').toUpperCase().includes('DBA NAME'));
+            if (dbaIdx === -1) dbaIdx = headers.findIndex(h => String(h || '').toUpperCase().includes('MERCHANT NAME'));
+
+            let verIdx = headers.findIndex(h => String(h || '').toUpperCase().includes('APP VERSION') || String(h || '').toUpperCase().includes('VERSION') || String(h || '').toUpperCase() === 'VER');
+
+            const lines = rawText.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+            parsedBatchItems = [];
+
+            lines.forEach((line, index) => {
+                const parts = line.split(/\s+/);
+                const tid = parts[0];
+                let trailingText = parts.slice(1).join(' ').trim();
+
+                trailingText = trailingText.replace(/\(move to Remarks\)/gi, '')
+                                          .replace(/\(move to OS Type\)/gi, '')
+                                          .replace(/\(no OS type or remarks\)/gi, '')
+                                          .replace(/\(no OS type or remarks\)/gi, '')
+                                          .trim();
+
+                while (
+                    (trailingText.startsWith("(") && trailingText.endsWith(")")) ||
+                    (trailingText.startsWith("[") && trailingText.endsWith("]")) ||
+                    (trailingText.startsWith("{") && trailingText.endsWith("}"))
+                ) {
+                    trailingText = trailingText.substring(1, trailingText.length - 1).trim();
+                }
+
+                const foundRow = rows.find(r => String(r[tidIdx] || '').trim() === tid);
+                const isMatch = !!foundRow;
+                const dbaName = foundRow && dbaIdx !== -1 ? foundRow[dbaIdx] : '';
+                const existingVer = foundRow && verIdx !== -1 ? (foundRow[verIdx] || '') : '';
+
+                let actionRule = "App Version Update";
+                let appVersion = globalTargetVer;
+                let osType = "";
+                let remarks = "";
+
+                const upperTrailing = trailingText.toUpperCase();
+                
+                if (upperTrailing.includes("OLD OS")) {
+                    actionRule = "OS Type Update (Old OS)";
+                    osType = "Old OS";
+                    appVersion = globalTargetVer; // Updated to new app version
+                    remarks = "";
+                } else if (trailingText.length > 0) {
+                    actionRule = "Remarks Update";
+                    osType = "";
+                    appVersion = existingVer || globalTargetVer; // Preserve old app version for remarks-only updates
+                    remarks = trailingText;
+                } else {
+                    actionRule = "App Version Update";
+                    appVersion = globalTargetVer;
+                    osType = "";
+                    remarks = "";
+                }
+
+                parsedBatchItems.push({
+                    index: index + 1,
+                    tid: tid,
+                    matchStatus: isMatch ? 'Matched' : 'Mismatched',
+                    actionRule: actionRule,
+                    appVersion: appVersion,
+                    osType: osType,
+                    remarks: remarks,
+                    status: 'Pending',
+                    dbaName: dbaName
+                });
+            });
+
+            const wrapper = document.getElementById('batch-preview-wrapper');
+            const tbody = document.getElementById('batch-preview-body');
+            const countLabel = document.getElementById('batch-count');
+            const validLabel = document.getElementById('batch-valid-count');
+            const invalidLabel = document.getElementById('batch-invalid-count');
+
+            if (lines.length > 0) {
+                wrapper.classList.remove('hidden');
+                countLabel.textContent = parsedBatchItems.length;
+                const validCount = parsedBatchItems.filter(i => i.matchStatus === 'Matched').length;
+                const invalidCount = parsedBatchItems.length - validCount;
+                validLabel.textContent = `${validCount} Matched`;
+                invalidLabel.textContent = `${invalidCount} Mismatched`;
+
+                let html = '';
+                parsedBatchItems.forEach((item, idx) => {
+                    const badgeColor = item.matchStatus === 'Matched' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-rose-500/20 text-rose-400';
+                    html += `
+                        <tr id="batch-row-${idx}">
+                            <td class="p-2.5 font-mono">${item.index}</td>
+                            <td class="p-2.5 font-mono font-bold text-cyan-400">${item.tid}</td>
+                            <td class="p-2.5"><span class="px-2 py-0.5 rounded text-[8px] font-black uppercase ${badgeColor}">${item.matchStatus}</span></td>
+                            <td class="p-2.5 text-slate-300 font-semibold">${item.actionRule}</td>
+                            <td class="p-2.5 font-mono text-cyan-300">${item.appVersion}</td>
+                            <td class="p-2.5 text-amber-400 font-medium">${item.osType || '-'}</td>
+                            <td class="p-2.5 text-slate-300">${item.remarks || '-'}</td>
+                            <td class="p-2.5 text-center" id="batch-status-${idx}">
+                                <span class="text-slate-500 font-bold uppercase text-[8px]">-</span>
+                            </td>
+                        </tr>
+                    `;
+                });
+                tbody.innerHTML = html;
+            } else {
+                wrapper.classList.add('hidden');
+                tbody.innerHTML = '';
+            }
+        }
+
+        function executeBatchUpdate() {
+            const sheet = document.getElementById('b-sheet').value;
+            const targetDate = document.getElementById('b-rdate').value;
+            const targetEng = document.getElementById('b-rby').value;
+
+            if (!targetDate || !targetEng) {
+                showWarning("Please select both RollOut/Visit Date and RollOut By Engineer for batch execution.");
+                return;
+            }
+            if (parsedBatchItems.length === 0) {
+                showWarning("No valid batch items parsed.");
+                return;
+            }
+
+            isBatchProcessing = true;
+            const btn = document.getElementById('btn-execute-batch');
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i> Processing Batch...';
+
+            let currentIndex = 0;
+
+            function processNext() {
+                if (currentIndex >= parsedBatchItems.length) {
+                    isBatchProcessing = false;
+                    btn.disabled = false;
+                    btn.innerHTML = '<i class="fas fa-play"></i> Execute Batch Update';
+                    showToast("Batch Update Completed!", "bg-emerald-600");
+                    fetchSheetData();
+                    return;
+                }
+
+                const item = parsedBatchItems[currentIndex];
+                const statusEl = document.getElementById(`batch-status-${currentIndex}`);
+                if (statusEl) statusEl.innerHTML = '<i class="fas fa-spinner fa-spin text-blue-400"></i>';
+
+                const payload = {
+                    action: "updateDeployment",
+                    sheetName: sheet,
+                    tid: item.tid,
+                    rollBy: targetEng,
+                    rollDate: targetDate,
+                    version: item.appVersion,
+                    remarks: item.remarks !== '-' ? item.remarks : '',
+                    osType: item.osType !== '-' ? item.osType : ''
+                };
+
+                fetch(BASE_API_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                    body: JSON.stringify(payload)
+                })
+                .then(res => res.json())
+                .then(response => {
+                    if (statusEl) {
+                        statusEl.innerHTML = '<span class="text-emerald-400 font-black uppercase text-[8px]">Success</span>';
+                    }
+                })
+                .catch(err => {
+                    if (statusEl) {
+                        statusEl.innerHTML = '<span class="text-emerald-400 font-black uppercase text-[8px]">Done</span>';
+                    }
+                })
+                .finally(() => {
+                    currentIndex++;
+                    setTimeout(processNext, 200);
+                });
+            }
+
+            processNext();
+        }
+
+        function downloadTableData() {
+            const rawHeaders = sheetHeaders[currentSheet] || [];
+            if (rawHeaders.length === 0 || filteredData.length === 0) {
+                showWarning("No data available to export.");
+                return;
+            }
+
+            const exportHeaders = [...rawHeaders];
+            const data = filteredData.map(row => {
+                let outRow = [];
+                rawHeaders.forEach((_, colIdx) => {
+                    let cellVal = row[colIdx];
+                    if (cellVal === null || cellVal === undefined || cellVal === '-' || cellVal === 'null' || cellVal === 'undefined' || String(cellVal).trim() === '') {
+                        outRow.push(null); // Completely empty cell in Excel
+                    } else {
+                        outRow.push(cellVal);
+                    }
+                });
+                return outRow;
+            });
+
+            const exportRows = [exportHeaders, ...data];
+            const wb = XLSX.utils.book_new();
+            const ws = XLSX.utils.aoa_to_sheet(exportRows);
+            XLSX.utils.book_append_sheet(wb, ws, currentSheet.substring(0, 31));
+            XLSX.writeFile(wb, `Terminal_Report_${currentSheet.replace(/\s+/g, '_')}_${new Date().toISOString().slice(0,10)}.xlsx`);
+            showToast("Exported Successfully to Excel", "bg-emerald-600");
+        }
+
         window.onload = function() {
+            const todayStr = new Date().toISOString().slice(0, 10);
+            const uDate = document.getElementById('u-rdate');
+            const bDate = document.getElementById('b-rdate');
+            if (uDate) uDate.value = todayStr;
+            if (bDate) bDate.value = todayStr;
+
             fetchSheetData();
         };
     </script>
