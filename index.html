@@ -30,6 +30,7 @@
             scrollbar-color: #475569 #1e293b; 
             max-height: 55vh; 
             overflow: auto; 
+            position: relative;
         }
 
         .table-container::-webkit-scrollbar { width: 6px; height: 6px; }
@@ -43,14 +44,13 @@
         .clock-font { font-family: 'JetBrains Mono', monospace; }
         
         th {
-            white-space: normal !important;
-            word-break: break-word;
-            padding: 10px !important;
+            white-space: nowrap !important;
+            padding: 8px 10px !important;
             vertical-align: middle !important;
             font-size: 10px !important;
             letter-spacing: 0.05em;
-            line-height: 1.2;
             text-align: left;
+            user-select: none;
         }
 
         .sticky-col-copy { 
@@ -165,6 +165,72 @@
         #warning-modal { opacity: 0; pointer-events: none; transform: scale(0.95); transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
         #warning-modal.active { opacity: 1; pointer-events: auto; transform: scale(1); }
         .shadow-input::placeholder { color: #3b82f6; font-style: italic; opacity: 0.7; }
+
+        .excel-filter-dropdown {
+            position: absolute;
+            background: #1e293b;
+            border: 1px solid #475569;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.6);
+            border-radius: 0.5rem;
+            z-index: 100;
+            width: 260px;
+            padding: 10px;
+            font-size: 11px;
+            color: #f1f5f9;
+        }
+        .excel-filter-header {
+            font-weight: 700;
+            border-bottom: 1px solid #334155;
+            padding-bottom: 6px;
+            margin-bottom: 6px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .excel-filter-search {
+            width: 100%;
+            background: #0f172a;
+            border: 1px solid #334155;
+            border-radius: 4px;
+            padding: 5px 8px;
+            color: white;
+            font-size: 11px;
+            outline: none;
+            margin-bottom: 6px;
+        }
+        .excel-filter-list {
+            max-height: 150px;
+            overflow-y: auto;
+            border: 1px solid #334155;
+            border-radius: 4px;
+            background: #0f172a;
+            padding: 4px;
+            margin-bottom: 8px;
+        }
+        .excel-filter-list label {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 3px 4px;
+            border-radius: 3px;
+            cursor: pointer;
+        }
+        .excel-filter-list label:hover {
+            background: rgba(51, 65, 85, 0.6);
+        }
+        .th-filter-btn {
+            background: transparent;
+            border: none;
+            color: #94a3b8;
+            cursor: pointer;
+            padding: 2px 4px;
+            border-radius: 3px;
+            transition: all 0.2s;
+        }
+        .th-filter-btn:hover, .th-filter-btn.active-filter {
+            color: #38bdf8;
+            background: rgba(56, 189, 248, 0.1);
+        }
     </style>
 </head>
 <body class="p-3 md:p-6" onclick="handleBodyClick(event)">
@@ -281,7 +347,7 @@
                 </div>
             </div>
             
-            <div class="table-container">
+            <div class="table-container" id="tableContainer">
                 <table class="w-full text-left text-[11px]" id="terminalTable">
                     <thead class="sticky top-0 z-40" id="terminalTableHeader"></thead>
                     <tbody id="terminalTableBody" class="divide-y divide-slate-800/50">
@@ -440,6 +506,11 @@
         let currentPage = 1;
         const pageSize = 50; 
 
+        // Excel-style filter states
+        let columnFilters = {}; // colIdx -> Set of selected values (empty or undefined means all selected)
+        let columnSorts = {};   // colIdx -> 'asc' | 'desc' | null
+        let activeFilterPopup = null;
+
         let parsedBatchItems = [];
         let isBatchProcessing = false;
 
@@ -503,6 +574,11 @@
             const multiWrapper = document.getElementById('multiSearchWrapper');
             if (multiWrapper && !multiWrapper.contains(event.target)) {
                 multiWrapper.classList.remove('expanded');
+            }
+            // Close excel filter dropdown if clicked outside
+            if (activeFilterPopup && !activeFilterPopup.contains(event.target) && !event.target.closest('.th-filter-btn')) {
+                activeFilterPopup.remove();
+                activeFilterPopup = null;
             }
         }
 
@@ -898,6 +974,13 @@
 
         function switchSheet(sheetName) {
             currentSheet = sheetName;
+            columnFilters = {}; // Reset column filters on sheet change
+            columnSorts = {};   // Reset sorts on sheet change
+            if (activeFilterPopup) {
+                activeFilterPopup.remove();
+                activeFilterPopup = null;
+            }
+
             document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.toggle('active', btn.id === `tab-${sheetName}`));
             
             const targetSheetSelect = document.getElementById('u-sheet');
@@ -908,22 +991,248 @@
             updateStatsCards(Object.keys(allSheetsData));
             renderVersionBreakdown();
 
-            filteredData = [...(allSheetsData[sheetName] || [])];
-            currentPage = 1;
-            renderTable();
+            applyFiltersAndSort();
             handleTIDLookup(); 
             if (!document.getElementById('batch-mode-container').classList.contains('hidden')) {
                 parseBatchInput();
             }
         }
 
-        function getOrderedColumns(headers) {
-            let tidIdx = headers.findIndex(h => String(h || '').toUpperCase().trim() === 'TID');
-            let otherIndices = [];
-            headers.forEach((h, idx) => {
-                otherIndices.push(idx);
+        function toggleColumnFilter(event, colIdx) {
+            event.stopPropagation();
+            const btn = event.currentTarget;
+            const rect = btn.getBoundingClientRect();
+            
+            if (activeFilterPopup) {
+                activeFilterPopup.remove();
+                activeFilterPopup = null;
+            }
+
+            const headers = sheetHeaders[currentSheet] || [];
+            const colName = headers[colIdx] || `Column ${colIdx+1}`;
+            
+            // Gather all unique values for this column from raw data
+            const rawRows = allSheetsData[currentSheet] || [];
+            const valueCounts = {};
+            rawRows.forEach(row => {
+                let val = row[colIdx];
+                const hName = String(headers[colIdx] || '').trim().toUpperCase();
+                if ((hName.includes('DATE') || hName.includes('VISIT')) && val) {
+                    val = formatDateReadable(val);
+                }
+                const strVal = (val === null || val === undefined || val === '-' || String(val).trim() === '') ? '(Blanks)' : String(val).trim();
+                valueCounts[strVal] = (valueCounts[strVal] || 0) + 1;
             });
-            return { tidIdx, otherIndices };
+
+            const uniqueValues = Object.keys(valueCounts).sort((a, b) => {
+                if (a === '(Blanks)') return 1;
+                if (b === '(Blanks)') return -1;
+                return a.localeCompare(b, undefined, {numeric: true});
+            });
+
+            // Check if filter is active for this column
+            const currentSelected = columnFilters[colIdx];
+            const isAllSelected = !currentSelected;
+
+            const popup = document.createElement('div');
+            popup.className = 'excel-filter-dropdown';
+            // Position relative to viewport or table container
+            let leftPos = rect.left;
+            if (leftPos + 260 > window.innerWidth) {
+                leftPos = window.innerWidth - 270;
+            }
+            popup.style.top = (rect.bottom + 4) + 'px';
+            popup.style.left = leftPos + 'px';
+
+            let optionsHtml = '';
+            uniqueValues.forEach((val, vIdx) => {
+                const isChecked = isAllSelected || currentSelected.has(val);
+                optionsHtml += `
+                    <label>
+                        <input type="checkbox" class="excel-val-chk" data-val="${escapeHTML(val)}" ${isChecked ? 'checked' : ''} onchange="onFilterCheckboxChange(${colIdx})">
+                        <span class="truncate" title="${escapeHTML(val)}">${escapeHTML(val)} <span class="text-slate-500 text-[9px]">(${valueCounts[val]})</span></span>
+                    </label>
+                `;
+            });
+
+            const currentSort = columnSorts[colIdx] || '';
+
+            popup.innerHTML = `
+                <div class="excel-filter-header">
+                    <span class="truncate max-w-[180px]">Filter: ${escapeHTML(colName)}</span>
+                    <button onclick="closeFilterPopup()" class="text-slate-400 hover:text-white"><i class="fas fa-times"></i></button>
+                </div>
+                <div class="flex gap-1 mb-2">
+                    <button onclick="sortColumn(${colIdx}, 'asc')" class="flex-1 bg-slate-800 hover:bg-slate-700 py-1 rounded text-[10px] font-bold ${currentSort === 'asc' ? 'text-blue-400 border border-blue-500/50' : 'text-slate-300'}"><i class="fas fa-sort-alpha-down mr-1"></i> Asc</button>
+                    <button onclick="sortColumn(${colIdx}, 'desc')" class="flex-1 bg-slate-800 hover:bg-slate-700 py-1 rounded text-[10px] font-bold ${currentSort === 'desc' ? 'text-blue-400 border border-blue-500/50' : 'text-slate-300'}"><i class="fas fa-sort-alpha-up mr-1"></i> Desc</button>
+                </div>
+                <input type="text" placeholder="Search values..." class="excel-filter-search" oninput="filterCheckboxList(this)" />
+                <div class="flex justify-between items-center px-1 mb-1 text-[10px]">
+                    <button onclick="toggleSelectAllFilter(${colIdx}, true)" class="text-blue-400 hover:underline">Select All</button>
+                    <button onclick="toggleSelectAllFilter(${colIdx}, false)" class="text-rose-400 hover:underline">Clear All</button>
+                </div>
+                <div class="excel-filter-list" id="filter-chk-list-${colIdx}">
+                    ${optionsHtml}
+                </div>
+                <div class="flex gap-2">
+                    <button onclick="applyColumnFilter(${colIdx})" class="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-1.5 rounded text-[10px] uppercase">Apply</button>
+                    <button onclick="clearColumnFilter(${colIdx})" class="w-full bg-slate-700 hover:bg-slate-600 text-slate-200 font-bold py-1.5 rounded text-[10px] uppercase">Reset</button>
+                </div>
+            `;
+
+            document.body.appendChild(popup);
+            activeFilterPopup = popup;
+            popup.onclick = (e) => e.stopPropagation();
+        }
+
+        function escapeHTML(str) {
+            return String(str).replace(/[&<>'"]/g, 
+                tag => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[tag] || tag)
+            );
+        }
+
+        function closeFilterPopup() {
+            if (activeFilterPopup) {
+                activeFilterPopup.remove();
+                activeFilterPopup = null;
+            }
+        }
+
+        function filterCheckboxList(input) {
+            const term = input.value.toLowerCase();
+            const container = input.parentElement.querySelector('.excel-filter-list');
+            const labels = container.querySelectorAll('label');
+            labels.forEach(lbl => {
+                const text = lbl.textContent.toLowerCase();
+                if (text.includes(term)) {
+                    lbl.style.display = 'flex';
+                } else {
+                    lbl.style.display = 'none';
+                }
+            });
+        }
+
+        function toggleSelectAllFilter(colIdx, selectAll) {
+            const container = document.getElementById(`filter-chk-list-${colIdx}`);
+            if (!container) return;
+            const checkboxes = container.querySelectorAll('.excel-val-chk');
+            checkboxes.forEach(chk => {
+                if (chk.parentElement.style.display !== 'none') {
+                    chk.checked = selectAll;
+                }
+            });
+        }
+
+        function onFilterCheckboxChange(colIdx) {
+            // Live interaction hook if needed
+        }
+
+        function applyColumnFilter(colIdx) {
+            const container = document.getElementById(`filter-chk-list-${colIdx}`);
+            if (!container) return;
+            const checkboxes = container.querySelectorAll('.excel-val-chk');
+            const selectedSet = new Set();
+            let allChecked = true;
+            let totalVisible = 0;
+
+            checkboxes.forEach(chk => {
+                totalVisible++;
+                if (chk.checked) {
+                    selectedSet.add(chk.getAttribute('data-val'));
+                } else {
+                    allChecked = false;
+                }
+            });
+
+            if (allChecked) {
+                delete columnFilters[colIdx];
+            } else {
+                columnFilters[colIdx] = selectedSet;
+            }
+
+            closeFilterPopup();
+            currentPage = 1;
+            applyFiltersAndSort();
+        }
+
+        function clearColumnFilter(colIdx) {
+            delete columnFilters[colIdx];
+            closeFilterPopup();
+            currentPage = 1;
+            applyFiltersAndSort();
+        }
+
+        function sortColumn(colIdx, direction) {
+            columnSorts = {}; // Single column sort for simplicity
+            columnSorts[colIdx] = direction;
+            closeFilterPopup();
+            applyFiltersAndSort();
+        }
+
+        function applyFiltersAndSort() {
+            const rawRows = allSheetsData[currentSheet] || [];
+            const headers = sheetHeaders[currentSheet] || [];
+            const globalSearch = document.getElementById('tableSearch').value.toLowerCase().trim();
+            const multiSearchText = document.getElementById('multi-search-input').value.trim();
+            const multiTerms = multiSearchText.split('\n').map(t => t.trim()).filter(t => t.length > 0);
+
+            // 1. Filter
+            let result = rawRows.filter(row => {
+                // Global search
+                if (globalSearch) {
+                    const matchGlobal = row.some(cell => String(cell || '').toLowerCase().includes(globalSearch));
+                    if (!matchGlobal) return false;
+                }
+
+                // Multi-term search
+                if (multiTerms.length > 0) {
+                    const matchMulti = row.some(cell => {
+                        const cellStr = String(cell || '').toLowerCase();
+                        return multiTerms.some(term => cellStr.includes(term.toLowerCase()));
+                    });
+                    if (!matchMulti) return false;
+                }
+
+                // Excel-style column filters
+                for (let colIdx in columnFilters) {
+                    const allowedSet = columnFilters[colIdx];
+                    let val = row[colIdx];
+                    const hName = String(headers[colIdx] || '').trim().toUpperCase();
+                    if ((hName.includes('DATE') || hName.includes('VISIT')) && val) {
+                        val = formatDateReadable(val);
+                    }
+                    const strVal = (val === null || val === undefined || val === '-' || String(val).trim() === '') ? '(Blanks)' : String(val).trim();
+                    if (!allowedSet.has(strVal)) {
+                        return false;
+                    }
+                }
+
+                return true;
+            });
+
+            // 2. Sort
+            let sortColIdx = Object.keys(columnSorts)[0];
+            if (sortColIdx !== undefined) {
+                const dir = columnSorts[sortColIdx];
+                result.sort((a, b) => {
+                    let valA = a[sortColIdx];
+                    let valB = b[sortColIdx];
+                    const hName = String(headers[sortColIdx] || '').trim().toUpperCase();
+                    if ((hName.includes('DATE') || hName.includes('VISIT'))) {
+                        valA = formatDateReadable(valA);
+                        valB = formatDateReadable(valB);
+                    }
+                    const strA = (valA === null || valA === undefined || valA === '-') ? '' : String(valA);
+                    const strB = (valB === null || valB === undefined || valB === '-') ? '' : String(valB);
+
+                    let comp = strA.localeCompare(strB, undefined, {numeric: true});
+                    return dir === 'asc' ? comp : -comp;
+                });
+            }
+
+            filteredData = result;
+            renderTable();
+            updateActiveFilterUI();
         }
 
         function renderTable() {
@@ -935,15 +1244,36 @@
             const { tidIdx, otherIndices } = getOrderedColumns(headers);
 
             let headerHtml = `<tr class="bg-slate-900 text-slate-300 uppercase text-[9px] font-black border-b border-slate-700/80">`;
-            headerHtml += `<th class="sticky-col-copy p-2.5 text-center">Copy</th>`;
+            headerHtml += `<th class="sticky-col-copy p-2 text-center">Copy</th>`;
             
             headers.forEach((h, idx) => {
                 const hName = String(h || '').trim();
                 const isTid = idx === tidIdx;
+                const hasFilter = columnFilters[idx] !== undefined;
+                const hasSort = columnSorts[idx] !== undefined;
+                const filterBtnClass = (hasFilter || hasSort) ? 'th-filter-btn active-filter' : 'th-filter-btn';
+                const filterIcon = hasSort ? (columnSorts[idx] === 'asc' ? 'fa-sort-alpha-down' : 'fa-sort-alpha-up') : 'fa-filter';
+
+                const filterButtonHtml = `
+                    <button class="${filterBtnClass}" onclick="toggleColumnFilter(event, ${idx})" title="Filter / Sort">
+                        <i class="fas ${filterIcon} text-[10px]"></i>
+                    </button>
+                `;
+
                 if (isTid) {
-                    headerHtml += `<th class="sticky-col-tid p-2.5 min-w-[105px]">${hName || 'TID'}</th>`;
+                    headerHtml += `<th class="sticky-col-tid p-2 min-w-[105px]">
+                        <div class="flex items-center justify-between gap-1">
+                            <span class="truncate">${hName || 'TID'}</span>
+                            ${filterButtonHtml}
+                        </div>
+                    </th>`;
                 } else {
-                    headerHtml += `<th class="p-2.5 min-w-[120px]">${hName || 'COL ' + (idx + 1)}</th>`;
+                    headerHtml += `<th class="p-2 min-w-[120px]">
+                        <div class="flex items-center justify-between gap-1">
+                            <span class="truncate">${hName || 'COL ' + (idx + 1)}</span>
+                            ${filterButtonHtml}
+                        </div>
+                    </th>`;
                 }
             });
             headerHtml += `</tr>`;
@@ -1002,48 +1332,20 @@
         function changePage(direction) {
             currentPage += direction;
             renderTable();
-            document.querySelector('.table-container')?.scrollTo(0, 0);
+            document.getElementById('tableContainer')?.scrollTo(0, 0);
         }
 
         function handleSearch() {
-            const query = document.getElementById('tableSearch').value.toLowerCase().trim();
-            const rawRows = allSheetsData[currentSheet] || [];
-            
-            if (!query) {
-                filteredData = [...rawRows];
-            } else {
-                filteredData = rawRows.filter(row => {
-                    return row.some(cell => String(cell || '').toLowerCase().includes(query));
-                });
-            }
-            currentPage = 1;
-            renderTable();
-            updateActiveFilterUI();
+            applyFiltersAndSort();
         }
 
         function handleMultiSearch() {
-            const rawText = document.getElementById('multi-search-input').value;
-            const terms = rawText.split('\n').map(t => t.trim()).filter(t => t.length > 0);
-            const rawRows = allSheetsData[currentSheet] || [];
-
-            if (terms.length === 0) {
-                filteredData = [...rawRows];
-            } else {
-                filteredData = rawRows.filter(row => {
-                    return row.some(cell => {
-                        const cellStr = String(cell || '').toLowerCase();
-                        return terms.some(term => cellStr.includes(term.toLowerCase()));
-                    });
-                });
-            }
-            currentPage = 1;
-            renderTable();
-            updateActiveFilterUI();
+            applyFiltersAndSort();
         }
 
         function clearMultiSearch() {
             document.getElementById('multi-search-input').value = '';
-            handleMultiSearch();
+            applyFiltersAndSort();
         }
 
         function updateActiveFilterUI() {
@@ -1055,6 +1357,8 @@
             let activeCount = 0;
             if (searchVal) activeCount++;
             if (multiVal) activeCount++;
+            activeCount += Object.keys(columnFilters).length;
+            activeCount += Object.keys(columnSorts).length;
 
             if (activeCount > 0) {
                 resetBtn.classList.remove('hidden');
@@ -1071,11 +1375,20 @@
             document.getElementById('multi-search-input').value = '';
             document.getElementById('searchWrapper').classList.remove('expanded');
             document.getElementById('multiSearchWrapper').classList.remove('expanded');
-            filteredData = [...(allSheetsData[currentSheet] || [])];
-            currentPage = 1;
-            renderTable();
-            updateActiveFilterUI();
-            showToast('All filters cleared', 'bg-blue-600');
+            columnFilters = {};
+            columnSorts = {};
+            closeFilterPopup();
+            applyFiltersAndSort();
+            showToast('All filters & sorts cleared', 'bg-blue-600');
+        }
+
+        function getOrderedColumns(headers) {
+            let tidIdx = headers.findIndex(h => String(h || '').toUpperCase().trim() === 'TID');
+            let otherIndices = [];
+            headers.forEach((h, idx) => {
+                otherIndices.push(idx);
+            });
+            return { tidIdx, otherIndices };
         }
 
         function handleTIDLookup() {
@@ -1232,12 +1545,12 @@
                 if (upperTrailing.includes("OLD OS")) {
                     actionRule = "OS Type Update (Old OS)";
                     osType = "Old OS";
-                    appVersion = globalTargetVer; // Updated to new app version
+                    appVersion = globalTargetVer;
                     remarks = "";
                 } else if (trailingText.length > 0) {
                     actionRule = "Remarks Update";
                     osType = "";
-                    appVersion = existingVer || globalTargetVer; // Preserve old app version for remarks-only updates
+                    appVersion = existingVer || globalTargetVer;
                     remarks = trailingText;
                 } else {
                     actionRule = "App Version Update";
@@ -1377,14 +1690,36 @@
             }
 
             const exportHeaders = [...rawHeaders];
+            const dateIndices = rawHeaders.map((h, idx) => {
+                const hName = String(h || '').toUpperCase().trim();
+                return (hName.includes('DATE') || hName.includes('VISIT')) ? idx : -1;
+            }).filter(idx => idx !== -1);
+
             const data = filteredData.map(row => {
                 let outRow = [];
                 rawHeaders.forEach((_, colIdx) => {
                     let cellVal = row[colIdx];
                     if (cellVal === null || cellVal === undefined || cellVal === '-' || cellVal === 'null' || cellVal === 'undefined' || String(cellVal).trim() === '') {
-                        outRow.push(null); // Completely empty cell in Excel
+                        outRow.push(null);
                     } else {
-                        outRow.push(cellVal);
+                        if (dateIndices.includes(colIdx)) {
+                            // Convert date to MM/DD/YYYY format for easy Excel filtering
+                            try {
+                                const parsedDate = new Date(cellVal);
+                                if (!isNaN(parsedDate.getTime())) {
+                                    const mm = String(parsedDate.getMonth() + 1).padStart(2, '0');
+                                    const dd = String(parsedDate.getDate()).padStart(2, '0');
+                                    const yyyy = parsedDate.getFullYear();
+                                    outRow.push(`${mm}/${dd}/${yyyy}`);
+                                } else {
+                                    outRow.push(cellVal);
+                                }
+                            } catch(e) {
+                                outRow.push(cellVal);
+                            }
+                        } else {
+                            outRow.push(cellVal);
+                        }
                     }
                 });
                 return outRow;
