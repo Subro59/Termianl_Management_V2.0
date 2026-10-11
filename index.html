@@ -164,6 +164,10 @@
 
         #warning-modal { opacity: 0; pointer-events: none; transform: scale(0.95); transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
         #warning-modal.active { opacity: 1; pointer-events: auto; transform: scale(1); }
+        
+        #auth-modal { opacity: 0; pointer-events: none; transform: scale(0.95); transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
+        #auth-modal.active { opacity: 1; pointer-events: auto; transform: scale(1); }
+
         .shadow-input::placeholder { color: #3b82f6; font-style: italic; opacity: 0.7; }
 
         .excel-filter-dropdown {
@@ -234,6 +238,34 @@
     </style>
 </head>
 <body class="p-3 md:p-6" onclick="handleBodyClick(event)">
+
+    <div id="auth-modal" class="fixed inset-0 z-[120] flex items-center justify-center bg-slate-950/90 backdrop-blur-md hidden">
+        <div class="glass-card max-w-sm w-full p-6 border-blue-500/50 shadow-[0_0_50px_rgba(59,130,246,0.3)] mx-4 text-center">
+            <div class="flex flex-col items-center space-y-4">
+                <div class="w-16 h-16 bg-blue-500/20 rounded-full flex items-center justify-center mb-1">
+                    <i class="fas fa-shield-alt text-3xl text-blue-400"></i>
+                </div>
+                <h2 class="text-xl font-black text-white uppercase tracking-tighter">Terminal Controls Access</h2>
+                <p class="text-slate-400 text-xs leading-relaxed">Please authenticate with your credentials to access Terminal Update Controls.</p>
+                
+                <div class="w-full space-y-3 text-left">
+                    <div>
+                        <label class="text-[9px] text-slate-400 font-bold uppercase">User ID</label>
+                        <input type="text" id="auth-userid" value="" placeholder="Enter User ID" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs focus:border-blue-500 outline-none text-white mt-1">
+                    </div>
+                    <div>
+                        <label class="text-[9px] text-slate-400 font-bold uppercase">Password</label>
+                        <input type="password" id="auth-password" value="" placeholder="Enter Password" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs focus:border-blue-500 outline-none text-white mt-1">
+                    </div>
+                </div>
+
+                <div class="flex gap-2 w-full">
+                    <button onclick="closeAuthModal()" class="w-1/2 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold py-3 rounded-xl transition-all uppercase text-xs tracking-wider">Cancel</button>
+                    <button onclick="verifyCredentials()" class="w-1/2 bg-blue-600 hover:bg-blue-500 text-white font-black py-3 rounded-xl transition-all uppercase text-xs tracking-widest shadow-lg">Authenticate</button>
+                </div>
+            </div>
+        </div>
+    </div>
 
     <div id="warning-modal" class="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/80 backdrop-blur-sm hidden">
         <div class="glass-card max-w-md w-full p-6 border-rose-500/50 shadow-[0_0_50px_rgba(244,63,94,0.3)] mx-4 text-center">
@@ -365,7 +397,7 @@
             </div>
         </section>
 
-        <section class="glass-card p-4 border-l-4 border-l-blue-500">
+        <section id="update-controls-section" class="glass-card p-4 border-l-4 border-l-blue-500 hidden">
             <div class="flex items-center justify-between mb-4 flex-wrap gap-2 border-b border-slate-800 pb-3">
                 <div class="flex items-center gap-3">
                     <div class="flex items-center gap-2">
@@ -491,12 +523,18 @@
                 </div>
             </div>
         </section>
+
+        <div id="auth-trigger-section" class="glass-card p-4 border-dashed border-2 border-slate-700 text-center">
+            <button onclick="checkAuthBeforeAction()" class="bg-blue-600/20 hover:bg-blue-600 text-blue-400 hover:text-white px-6 py-3 rounded-xl text-xs font-black uppercase tracking-widest border border-blue-500/30 transition-all flex items-center justify-center gap-2 mx-auto">
+                <i class="fas fa-lock text-sm"></i> Unlock Terminal Update Controls
+            </button>
+        </div>
     </div>
 
     <div id="toast" class="fixed bottom-8 left-1/2 -translate-x-1/2 px-8 py-3 rounded-xl text-white text-[11px] font-black uppercase tracking-widest transition-all duration-300 opacity-0 pointer-events-none z-[200] shadow-2xl"></div>
 
     <script>
-        const BASE_API_URL = `https://script.google.com/macros/s/AKfycbzfbgRI99_JbHm_0baKuCsvj5WGpBKCgKKWsVCuzKIXFTtTvzCL972OIjmbsXp9T3Femg/exec`;
+        const BASE_API_URL = `https://script.google.com/macros/s/AKfycbzca0FDAgNznuDcWgR4mwhb8h5YVlBEP4qK2dQJ69NI0RHJ08Dc-thPjDCVcetrCOajBQ/exec`;
 
         let allSheetsData = {};
         let sheetHeaders = {};
@@ -507,17 +545,62 @@
         const pageSize = 50; 
 
         // Excel-style filter states
-        let columnFilters = {}; // colIdx -> Set of selected values (empty or undefined means all selected)
-        let columnSorts = {};   // colIdx -> 'asc' | 'desc' | null
+        let columnFilters = {}; 
+        let columnSorts = {};   
         let activeFilterPopup = null;
 
         let parsedBatchItems = [];
         let isBatchProcessing = false;
+        let isAuthenticated = false;
 
         const cleanStr = (val) => String(val || '').replace(/[^a-zA-Z0-9]/g, '').toUpperCase().trim();
         const normalizeVer = (val) => String(val || '').trim().toLowerCase();
 
+        function checkAuthBeforeAction(event) {
+            if (!isAuthenticated) {
+                if (event && event.target) {
+                    event.target.blur();
+                }
+                const modal = document.getElementById('auth-modal');
+                document.getElementById('auth-userid').value = '';
+                document.getElementById('auth-password').value = '';
+                modal.classList.remove('hidden');
+                setTimeout(() => modal.classList.add('active'), 10);
+            }
+        }
+
+        function closeAuthModal() {
+            const modal = document.getElementById('auth-modal');
+            modal.classList.remove('active');
+            setTimeout(() => modal.classList.add('hidden'), 300);
+        }
+
+        function verifyCredentials() {
+            const uidInput = document.getElementById('auth-userid').value.trim();
+            const passInput = document.getElementById('auth-password').value.trim();
+            
+            if (uidInput === 'Susanta_59' && passInput === '180562') {
+                isAuthenticated = true;
+                const modal = document.getElementById('auth-modal');
+                modal.classList.remove('active');
+                setTimeout(() => modal.classList.add('hidden'), 300);
+                
+                // Show update controls and hide trigger banner
+                document.getElementById('update-controls-section').classList.remove('hidden');
+                document.getElementById('auth-trigger-section').classList.add('hidden');
+
+                showToast("Authentication Successful", "bg-emerald-600");
+            } else {
+                showToast("Invalid User ID or Password", "bg-rose-600");
+            }
+        }
+
         function switchUpdateMode(mode) {
+            if (!isAuthenticated) {
+                checkAuthBeforeAction();
+                return;
+            }
+
             const singleBtn = document.getElementById('mode-single-btn');
             const batchBtn = document.getElementById('mode-batch-btn');
             const singleContainer = document.getElementById('single-mode-container');
@@ -575,7 +658,6 @@
             if (multiWrapper && !multiWrapper.contains(event.target)) {
                 multiWrapper.classList.remove('expanded');
             }
-            // Close excel filter dropdown if clicked outside
             if (activeFilterPopup && !activeFilterPopup.contains(event.target) && !event.target.closest('.th-filter-btn')) {
                 activeFilterPopup.remove();
                 activeFilterPopup = null;
@@ -974,8 +1056,8 @@
 
         function switchSheet(sheetName) {
             currentSheet = sheetName;
-            columnFilters = {}; // Reset column filters on sheet change
-            columnSorts = {};   // Reset sorts on sheet change
+            columnFilters = {}; 
+            columnSorts = {};   
             if (activeFilterPopup) {
                 activeFilterPopup.remove();
                 activeFilterPopup = null;
@@ -1011,7 +1093,6 @@
             const headers = sheetHeaders[currentSheet] || [];
             const colName = headers[colIdx] || `Column ${colIdx+1}`;
             
-            // Gather all unique values for this column from raw data
             const rawRows = allSheetsData[currentSheet] || [];
             const valueCounts = {};
             rawRows.forEach(row => {
@@ -1030,13 +1111,11 @@
                 return a.localeCompare(b, undefined, {numeric: true});
             });
 
-            // Check if filter is active for this column
             const currentSelected = columnFilters[colIdx];
             const isAllSelected = !currentSelected;
 
             const popup = document.createElement('div');
             popup.className = 'excel-filter-dropdown';
-            // Position relative to viewport or table container
             let leftPos = rect.left;
             if (leftPos + 260 > window.innerWidth) {
                 leftPos = window.innerWidth - 270;
@@ -1045,7 +1124,7 @@
             popup.style.left = leftPos + 'px';
 
             let optionsHtml = '';
-            uniqueValues.forEach((val, vIdx) => {
+            uniqueValues.forEach((val) => {
                 const isChecked = isAllSelected || currentSelected.has(val);
                 optionsHtml += `
                     <label>
@@ -1123,9 +1202,7 @@
             });
         }
 
-        function onFilterCheckboxChange(colIdx) {
-            // Live interaction hook if needed
-        }
+        function onFilterCheckboxChange(colIdx) {}
 
         function applyColumnFilter(colIdx) {
             const container = document.getElementById(`filter-chk-list-${colIdx}`);
@@ -1133,10 +1210,8 @@
             const checkboxes = container.querySelectorAll('.excel-val-chk');
             const selectedSet = new Set();
             let allChecked = true;
-            let totalVisible = 0;
 
             checkboxes.forEach(chk => {
-                totalVisible++;
                 if (chk.checked) {
                     selectedSet.add(chk.getAttribute('data-val'));
                 } else {
@@ -1163,7 +1238,7 @@
         }
 
         function sortColumn(colIdx, direction) {
-            columnSorts = {}; // Single column sort for simplicity
+            columnSorts = {}; 
             columnSorts[colIdx] = direction;
             closeFilterPopup();
             applyFiltersAndSort();
@@ -1176,15 +1251,12 @@
             const multiSearchText = document.getElementById('multi-search-input').value.trim();
             const multiTerms = multiSearchText.split('\n').map(t => t.trim()).filter(t => t.length > 0);
 
-            // 1. Filter
             let result = rawRows.filter(row => {
-                // Global search
                 if (globalSearch) {
                     const matchGlobal = row.some(cell => String(cell || '').toLowerCase().includes(globalSearch));
                     if (!matchGlobal) return false;
                 }
 
-                // Multi-term search
                 if (multiTerms.length > 0) {
                     const matchMulti = row.some(cell => {
                         const cellStr = String(cell || '').toLowerCase();
@@ -1193,7 +1265,6 @@
                     if (!matchMulti) return false;
                 }
 
-                // Excel-style column filters
                 for (let colIdx in columnFilters) {
                     const allowedSet = columnFilters[colIdx];
                     let val = row[colIdx];
@@ -1210,7 +1281,6 @@
                 return true;
             });
 
-            // 2. Sort
             let sortColIdx = Object.keys(columnSorts)[0];
             if (sortColIdx !== undefined) {
                 const dir = columnSorts[sortColIdx];
@@ -1241,7 +1311,7 @@
             const headers = sheetHeaders[currentSheet] || [];
             if (!tbody || headers.length === 0) return;
 
-            const { tidIdx, otherIndices } = getOrderedColumns(headers);
+            const { tidIdx } = getOrderedColumns(headers);
 
             let headerHtml = `<tr class="bg-slate-900 text-slate-300 uppercase text-[9px] font-black border-b border-slate-700/80">`;
             headerHtml += `<th class="sticky-col-copy p-2 text-center">Copy</th>`;
@@ -1703,7 +1773,6 @@
                         outRow.push(null);
                     } else {
                         if (dateIndices.includes(colIdx)) {
-                            // Convert date to MM/DD/YYYY format for easy Excel filtering
                             try {
                                 const parsedDate = new Date(cellVal);
                                 if (!isNaN(parsedDate.getTime())) {
